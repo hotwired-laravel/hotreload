@@ -1,0 +1,18 @@
+{
+    "name": "hotwired-laravel/hotreload",
+    "description": "Hot reloading for Hotwire",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "HotwiredLaravel\\Hotreload\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Tony Messias",
+            "email": "tonysm@hey.com"
+        }
+    ],
+    "require": {}
+}
