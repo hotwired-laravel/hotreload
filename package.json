@@ -1,0 +1,19 @@
+{
+  "name": "hotwired-laravel-hotreload",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "node ./scripts/build.js",
+    "watch": "node ./scripts/build.js --watch"
+  },
+  "author": "Tony Messias <tonysm@hey.com>",
+  "license": "MIT",
+  "description": "",
+  "devDependencies": {
+    "brotli-size": "^4.0.0",
+    "esbuild": "^0.14.29"
+  },
+  "dependencies": {
+    "idiomorph": "^0.4.0"
+  }
+}

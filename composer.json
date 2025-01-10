@@ -14,5 +14,21 @@
             "email": "tonysm@hey.com"
         }
     ],
-    "require": {}
+    "require-dev": {
+        "tightenco/duster": "^3.1"
+    },
+    "require": {
+        "illuminate/support": "^11.36",
+        "illuminate/http": "^11.36"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "\\HotwiredLaravel\\Hotreload\\HotreloadServiceProvider"
+            ]
+        }
+    }
 }
