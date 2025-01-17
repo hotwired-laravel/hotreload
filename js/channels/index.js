@@ -2,6 +2,7 @@ import { ReplaceHtmlReloader } from "../reloaders/replace_html_reloader.js";
 import { MorphHtmlReloader } from "../reloaders/morph_html_reloader.js";
 import { StimulusReloader } from "../reloaders/stimulus_reloader.js";
 import { CssReloader } from "../reloaders/css_reloader.js";
+import { assetNameFromPath } from "../helpers.js";
 
 export class ServerSentEventsChannel {
   static async start() {
@@ -25,7 +26,7 @@ export class ServerSentEventsChannel {
 
     sse.addEventListener("reload_css", (event) => {
       const data = JSON.parse(event.data);
-      return CssReloader.reload(data.path);
+      return CssReloader.reload(new RegExp(assetNameFromPath(data.path)));
     });
   }
 }

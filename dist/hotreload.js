@@ -40,6 +40,9 @@
   };
 
   // js/helpers.js
+  function assetNameFromPath(path) {
+    return path.split("/").pop().split(".")[0];
+  }
   function pathWithoutAssetDigest(path) {
     return path.replace(/-[a-z0-9]+\.(\w+)(\?.*)?$/, ".$1");
   }
@@ -969,8 +972,9 @@
     static async start() {
       const sse = new EventSource("/hotwired-laravel-hotreload/sse");
       sse.addEventListener("reload_html", (event) => {
+        const data = JSON.parse(event.data);
         const reloader = HotwireHotreload.config.htmlReloadMethod === "morph" ? MorphHtmlReloader : ReplaceHtmlReloader;
-        return reloader.reload();
+        return reloader.reload(data.path);
       });
       sse.addEventListener("reload_stimulus", (event) => {
         const data = JSON.parse(event.data);
@@ -978,7 +982,7 @@
       });
       sse.addEventListener("reload_css", (event) => {
         const data = JSON.parse(event.data);
-        return CssReloader.reload(data.path);
+        return CssReloader.reload(new RegExp(assetNameFromPath(data.path)));
       });
     }
   };
