@@ -53,7 +53,7 @@ class HotreloadServerSentEventsController
 
     private function send($event, $data): void
     {
-        $data = json_encode($data);
+        $data = json_encode($data, JSON_UNESCAPED_SLASHES);
 
         echo "event: {$event}\n";
         echo "data: {$data}\n\n";
