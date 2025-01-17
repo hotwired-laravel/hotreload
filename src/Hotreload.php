@@ -30,24 +30,24 @@ class Hotreload
 
     public static function htmlPaths(): array
     {
-        return array_merge([
+        return array_filter(array_merge([
             resource_path('views/'),
-        ], static::$htmlPaths);
+        ], static::$htmlPaths), 'is_dir');
     }
 
     public static function stimulusPaths(): array
     {
-        return array_merge([
+        return array_filter(array_merge([
             resource_path('js/controllers/'),
-        ], static::$stimulusPaths);
+        ], static::$stimulusPaths), 'is_dir');
     }
 
     public static function cssPaths(): array
     {
-        return array_merge(array_filter([
+        return array_filter(array_merge([
             resource_path('css/'),
-            is_dir(public_path('dist/css/')) ? public_path('dist/css/') : null,
-        ]), static::$cssPaths);
+            public_path('dist/css/'),
+        ], static::$cssPaths), 'is_dir');
     }
 
     public static function watchers(): FileWatchers

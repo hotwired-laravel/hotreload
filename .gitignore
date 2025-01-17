@@ -1,4 +1,9 @@
 vendor/
 node_modules/
+.phpunit.cache/
+tests/Browser/console
+tests/Browser/screenshots
+tests/Browser/source
+report.junit.xml
 package-lock.json
 composer.lock

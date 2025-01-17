@@ -15,6 +15,7 @@
         }
     ],
     "require-dev": {
+        "orchestra/testbench-dusk": "^9.11",
         "tightenco/duster": "^3.1"
     },
     "require": {
@@ -30,5 +31,30 @@
                 "\\HotwiredLaravel\\Hotreload\\HotreloadServiceProvider"
             ]
         }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Database\\Factories\\": "workbench/database/factories/",
+            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/",
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "@clear",
+            "@prepare",
+            "@dusk:install-chromedriver"
+        ],
+        "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
+        "prepare": "@php vendor/bin/testbench package:discover --ansi",
+        "dusk:install-chromedriver": "@php vendor/bin/dusk-updater detect --auto-update --ansi",
+        "build": "@php vendor/bin/testbench workbench:build --ansi",
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "@build",
+            "export PHP_CLI_SERVER_WORKERS=4",
+            "@php vendor/bin/testbench serve --ansi"
+        ]
     }
 }
