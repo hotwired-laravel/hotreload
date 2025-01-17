@@ -25,7 +25,7 @@ class HotreloadMiddleware
         $body = $response->getContent();
 
         if (File::exists($manifest = dirname(__DIR__, levels: 3) . '/dist/manifest.json')) {
-            $body = preg_replace('/(\s*)<\/head>/', "$1{$this->scriptTag($manifest)}\n$1</head>", $body);
+            $body = preg_replace('/(\s*)<\/head>/', "$1{$this->scriptTag(file_get_contents(trim($manifest)))}\n$1</head>", $body);
         }
 
         return $response->setContent($body);
