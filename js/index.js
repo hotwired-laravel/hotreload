@@ -27,6 +27,8 @@ const syncConfigs = async () => {
 document.addEventListener("DOMContentLoaded", async () => {
   await syncConfigs();
 
+  document.body.setAttribute("data-hotwire-hotreload-ready", "");
+
   await ServerSentEventsChannel.start();
 });
 

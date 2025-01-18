@@ -5,6 +5,7 @@ namespace HotwiredLaravel\Hotreload;
 use Closure;
 use HotwiredLaravel\Hotreload\Contracts\FileWatcher as ContractsFileWatcher;
 use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 
 class FileWatcher implements ContractsFileWatcher
 {
@@ -57,7 +58,7 @@ class FileWatcher implements ContractsFileWatcher
     {
         $files = [];
 
-        foreach ((new RecursiveDirectoryIterator($this->path)) as $item) {
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->path)) as $item) {
             if ($item->isDir()) {
                 continue;
             }
