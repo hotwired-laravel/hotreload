@@ -2,7 +2,7 @@
 
 It enhances development feedback loops by detecting source code changes and updating the page _smoothly_ without requiring manual reloads.
 
-__This package is still under development.__
+_This package is still under development._
 
 #### Inspiration
 
