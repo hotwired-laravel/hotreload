@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Support\Facades\File;
+use Laravel\Dusk\Browser;
 use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\Dusk\TestCase;
 use Override;
@@ -24,6 +25,8 @@ class BrowserTestCase extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Browser::$waitSeconds = env('CI') ? 10 : Browser::$waitSeconds;
 
         $this->cleanUpFixtures();
     }
