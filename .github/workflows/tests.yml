@@ -10,7 +10,6 @@ on:
 jobs:
   tests:
     runs-on: "ubuntu-latest"
-    continue-on-error: ${{ matrix.experimental }}
     strategy:
       matrix:
         php:
