@@ -14,6 +14,8 @@ class BrowserTestCase extends TestCase
 {
     use WithWorkbench;
 
+    protected static $waitSeconds;
+
     protected array $changedFiles = [];
 
     protected array $newFiles = [];
@@ -24,6 +26,8 @@ class BrowserTestCase extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        static::$waitSeconds = env('CI') ? 10 : 5;
 
         $this->cleanUpFixtures();
     }
