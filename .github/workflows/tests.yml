@@ -35,4 +35,6 @@ jobs:
           composer dusk:install-chromedriver
 
       - name: Execute tests
-        run: vendor/bin/phpunit
+        run: |
+          export PHP_CLI_SERVER_WORKERS=4
+          vendor/bin/phpunit
