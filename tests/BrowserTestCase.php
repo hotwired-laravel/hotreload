@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Support\Facades\File;
+use Laravel\Dusk\Browser;
 use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\Dusk\TestCase;
 use Override;
@@ -13,8 +14,6 @@ use function Orchestra\Testbench\package_path;
 class BrowserTestCase extends TestCase
 {
     use WithWorkbench;
-
-    protected static $waitSeconds;
 
     protected array $changedFiles = [];
 
@@ -27,7 +26,7 @@ class BrowserTestCase extends TestCase
     {
         parent::setUp();
 
-        static::$waitSeconds = env('CI') ? 10 : 5;
+        Browser::$waitSeconds = env('CI') ? 10 : Browser::$waitSeconds;
 
         $this->cleanUpFixtures();
     }
