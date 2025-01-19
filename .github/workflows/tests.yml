@@ -40,9 +40,6 @@ jobs:
         run: |
           composer show -D
 
-      - name: Create database
-        run: php testbench-dusk package:create-sqlite-db
-
       - name: Start Chrome Driver
         run: vendor/laravel/dusk/bin/chromedriver-linux --port=9515 &
 
