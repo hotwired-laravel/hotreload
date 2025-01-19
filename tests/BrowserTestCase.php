@@ -5,8 +5,7 @@ namespace Tests;
 use Illuminate\Support\Facades\File;
 use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\Dusk\TestCase;
-use PHPUnit\Framework\Attributes\After;
-use PHPUnit\Framework\Attributes\Before;
+use Override;
 use RecursiveDirectoryIterator;
 
 use function Orchestra\Testbench\package_path;
@@ -21,7 +20,22 @@ class BrowserTestCase extends TestCase
 
     protected array $deletedFiles = [];
 
-    #[Before()]
+    #[Override]
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->cleanUpFixtures();
+    }
+
+    #[Override]
+    protected function tearDown(): void
+    {
+        $this->restoreChangedFiles();
+
+        parent::tearDown();
+    }
+
     protected function cleanUpFixtures(): void
     {
         foreach (new RecursiveDirectoryIterator(package_path('tests', 'fixtures', 'files')) as $file) {
@@ -33,7 +47,6 @@ class BrowserTestCase extends TestCase
         }
     }
 
-    #[After()]
     protected function restoreChangedFiles(): void
     {
         foreach ($this->changedFiles as $moved => $original) {
