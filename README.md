@@ -72,6 +72,6 @@ You may configure additional paths by calling the respective method on the `Hotr
 use HotwiredLaravel\Hotreload\Hotreload;
 
 Hotreload::addHtmlPath(resource_path('images'));
-Hotreload::addCssPath(resource_path('resources/sass/'));
-Hotreload::addStimulusPath(resource_path('resources/js/bridge'));
+Hotreload::addCssPath(resource_path('sass'));
+Hotreload::addStimulusPath(resource_path('js/bridge'));
 ```
