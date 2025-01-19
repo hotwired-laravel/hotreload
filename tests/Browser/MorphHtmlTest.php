@@ -17,7 +17,7 @@ class MorphHtmlTest extends BrowserTestCase
             $visit = $browser->visit('/?reload_method=morph')
                 ->assertSee('REPLACE_HTML');
 
-            $visit->pause(300);
+            $visit->pause($this->waitingTimeMs());
 
             $this->editFile(workbench_path('resources', 'views', 'hello.blade.php'), 'REPLACE_HTML', 'Amazing!');
 

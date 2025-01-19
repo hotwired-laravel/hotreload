@@ -18,7 +18,7 @@ class StimulusReloadTest extends BrowserTestCase
                 ->waitForTextIn('#replace', '__REPLACED_STIMULUS__')
                 ->assertSee('__REPLACED_STIMULUS__');
 
-            $visit->pause(300);
+            $visit->pause($this->waitingTimeMs());
 
             $this->editFile(workbench_path('resources', 'assets', 'js', 'controllers', 'dummy_controller.js'), '__REPLACED_STIMULUS__', '__REPLACED_STIMULUS_V2__');
 
@@ -35,7 +35,7 @@ class StimulusReloadTest extends BrowserTestCase
                 ->waitForTextIn('#replace', '__REPLACED_STIMULUS__')
                 ->assertSee('__REPLACED_STIMULUS__');
 
-            $visit->pause(300);
+            $visit->pause($this->waitingTimeMs());
 
             $this->editFile(workbench_path('resources', 'views', 'hello.blade.php'), 'REPLACE_CONTROLLER', 'other-dummy');
             $this->addFile(workbench_path('resources', 'assets', 'js', 'controllers', 'other_dummy_controller.js'), <<<'JS'
@@ -61,11 +61,11 @@ class StimulusReloadTest extends BrowserTestCase
 
             $this->assertNotNull($visit->element('[data-dummy-version]'));
 
-            $visit->pause(300);
+            $visit->pause($this->waitingTimeMs());
 
             $this->deleteFile(workbench_path('resources', 'assets', 'js', 'controllers', 'dummy_controller.js'));
 
-            $visit->pause(300);
+            $visit->pause($this->waitingTimeMs());
 
             $this->assertNull($visit->element('[data-dummy-version]'), 'Controller was not disconnected');
         });

@@ -17,7 +17,7 @@ class ReplaceHtmlTest extends BrowserTestCase
             $visit = $browser->visit('/')
                 ->assertSee('REPLACE_HTML');
 
-            $visit->pause(200);
+            $visit->pause($this->waitingTimeMs());
 
             $this->editFile(workbench_path('resources', 'views', 'hello.blade.php'), 'REPLACE_HTML', 'Amazing!');
 
@@ -32,7 +32,7 @@ class ReplaceHtmlTest extends BrowserTestCase
             $visit = $browser->visit('/')
                 ->assertSee('REPLACE_NESTED');
 
-            $visit->pause(300);
+            $visit->pause($this->waitingTimeMs());
 
             $this->editFile(workbench_path('resources', 'views', 'components', 'test.blade.php'), 'REPLACE_NESTED', 'Awesome!');
 

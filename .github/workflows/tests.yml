@@ -37,6 +37,7 @@ jobs:
       - name: Execute tests
         run: |
           export PHP_CLI_SERVER_WORKERS=4
+          export BROWSER_TESTS_SLEEP_MS=600
           vendor/bin/phpunit
 
       - name: Upload Screenshots
