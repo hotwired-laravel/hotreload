@@ -7,7 +7,7 @@
         {{ $meta ?? '' }}
         <title>Hotreload App</title>
         @foreach (File::files(Orchestra\Testbench\workbench_path('resources', 'assets', 'css')) as $file)
-        <link href="{{ asset('/assetpipeline/css/' . str($file->getPathname())->afterLast('css' . DIRECTORY_SEPARATOR) . '?v=' . $file->getMtime()) }}" rel="stylesheet">
+        <link href="{{ asset('/assetpipeline/css/' . $file->getFilename() . '?v=' . $file->getMtime()) }}" rel="stylesheet">
         @endforeach
         <script type="importmap">
         {
