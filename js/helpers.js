@@ -3,7 +3,7 @@ export function assetNameFromPath(path) {
 }
 
 export function pathWithoutAssetDigest(path) {
-  return path.replace(/-[a-z0-9]+\.(\w+)(\?.*)?$/, ".$1");
+  return path.replace(/\?.*$/, "");
 }
 
 export function urlWithParams(urlString, params) {
