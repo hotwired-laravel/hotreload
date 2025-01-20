@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Exception;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Sleep;
 use Orchestra\Testbench\Concerns\WithWorkbench;
@@ -28,13 +29,21 @@ class BrowserTestCase extends TestCase
     #[Override]
     protected function setUp(): void
     {
-        parent::setUp();
+        $this->afterApplicationCreated(function () {
+            $this->clearViews();
+        });
+
+        $this->beforeApplicationDestroyed(function () {
+            $this->clearViews();
+        });
 
         Browser::$waitSeconds = env('CI') ? 10 : Browser::$waitSeconds;
 
         $this->waitedBeforeChanges = false;
 
         $this->cleanUpFixtures();
+
+        parent::setUp();
     }
 
     #[Override]
@@ -43,6 +52,11 @@ class BrowserTestCase extends TestCase
         $this->restoreChangedFiles();
 
         parent::tearDown();
+    }
+
+    protected function clearViews(): void
+    {
+        Artisan::call('view:clear');
     }
 
     /**
