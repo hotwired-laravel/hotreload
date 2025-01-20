@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Sleep;
 use Orchestra\Testbench\Concerns\WithWorkbench;
+use Orchestra\Testbench\Dusk\Options;
 use Orchestra\Testbench\Dusk\TestCase;
 use Override;
 use PHPUnit\Framework\Attributes\BeforeClass;
@@ -52,6 +53,11 @@ class BrowserTestCase extends TestCase
         $this->restoreChangedFiles();
 
         parent::tearDown();
+    }
+
+    public static function defineWebDriverOptions()
+    {
+        Options::windowSize(1024, 768);
     }
 
     protected function clearViews(): void
