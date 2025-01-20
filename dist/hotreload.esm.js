@@ -43,7 +43,7 @@ function assetNameFromPath(path) {
   return path.split("/").pop().split(".")[0];
 }
 function pathWithoutAssetDigest(path) {
-  return path.replace(/-[a-z0-9]+\.(\w+)(\?.*)?$/, ".$1");
+  return path.replace(/\?.*$/, "");
 }
 function urlWithParams(urlString, params) {
   const url = new URL(urlString, window.location.origin);
@@ -970,6 +970,13 @@ var CssReloader = class {
 var ServerSentEventsChannel = class {
   static async start() {
     const sse = new EventSource("/hotwired-laravel-hotreload/sse");
+    sse.addEventListener(
+      "tick",
+      () => {
+        document.body.setAttribute("data-hotwire-hotreload-ready", "true");
+      },
+      { once: true }
+    );
     sse.addEventListener("reload_html", (event) => {
       const data = JSON.parse(event.data);
       const reloader = HotwireHotreload.config.htmlReloadMethod === "morph" ? MorphHtmlReloader : ReplaceHtmlReloader;
@@ -1006,7 +1013,6 @@ var syncConfigs = async () => {
 };
 document.addEventListener("DOMContentLoaded", async () => {
   await syncConfigs();
-  document.body.setAttribute("data-hotwire-hotreload-ready", "");
   await ServerSentEventsChannel.start();
 });
 document.addEventListener("turbo:load", async () => {
