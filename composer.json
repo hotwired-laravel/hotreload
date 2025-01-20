@@ -19,6 +19,7 @@
         "tightenco/duster": "^3.1"
     },
     "require": {
+        "ext-inotify": "*",
         "illuminate/support": "^11.36",
         "illuminate/http": "^11.36"
     },

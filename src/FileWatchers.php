@@ -24,4 +24,11 @@ class FileWatchers implements FileWatcher
             $watcher->tick();
         }
     }
+
+    public function stop(): void
+    {
+        foreach ($this->watchers as $watcher) {
+            $watcher->stop();
+        }
+    }
 }

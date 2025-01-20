@@ -7,4 +7,6 @@ interface FileWatcher
     public function boot(): void;
 
     public function tick(): void;
+
+    public function stop(): void;
 }

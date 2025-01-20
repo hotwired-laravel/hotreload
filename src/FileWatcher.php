@@ -9,6 +9,10 @@ use RecursiveIteratorIterator;
 
 class FileWatcher implements ContractsFileWatcher
 {
+    private $fd;
+    private $watchers = [];
+    private $stopped = false;
+
     public function __construct(
         private string $path,
         private Closure $onChange,
@@ -17,59 +21,69 @@ class FileWatcher implements ContractsFileWatcher
 
     public function boot(): void
     {
-        $this->files = $this->scan();
+        $this->fd = inotify_init();
+
+        $this->watchers[] = inotify_add_watch($this->fd, $this->path, IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE);
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($this->path, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        // Add watch for each subdirectory
+        foreach ($iterator as $item) {
+            if ($item->isDir()) {
+                $this->watchers[] = inotify_add_watch($this->fd, $item->getPathname(), IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE);
+            }
+        }
+
+        $read = [$this->fd];
+        $write = null;
+        $except = null;
+        stream_select($read, $write, $except, 0);
+
+        stream_set_blocking($this->fd, 0);
     }
 
     public function tick(): void
     {
-        $oldFiles = $this->files;
-        $this->files = $this->scan();
+        $events = inotify_read($this->fd);
 
-        // Nothing changed, skip...
-        if (md5(json_encode($oldFiles)) === md5(json_encode($this->files))) {
+        if ($events === false) {
             return;
         }
 
-        $changes = [];
+        $events = collect($events)
+            ->lazy()
+            ->filter(fn ($event) => ! empty($event['name']))
+            ->filter(fn ($event) => ! is_numeric($event['name']))
+            ->filter(fn ($event) => ! str_starts_with($event['name'], '.'))
+            ->filter(fn ($event) => ! str_ends_with($event['name'], '~'))
+            ->groupBy('name')
+            ->all();
 
-        foreach ($this->files as $file => $mtime) {
-            if (! isset($oldFiles[$file])) {
-                // Added files...
-                $changes[] = $file;
-            } elseif ($oldFiles[$file] !== $mtime) {
-                // Modified files...
-                $changes[] = $file;
-            }
-        }
-
-        foreach ($oldFiles as $file => $mtime) {
-            // Removed files...
-            if (! isset($this->files[$file])) {
-                $changes[] = $file;
-            }
-        }
-
-        foreach ($changes as $change) {
-            call_user_func($this->onChange, $change);
+        foreach ($events as $file => $events) {
+            call_user_func($this->onChange, rtrim($this->path, '/') . "/{$file}");
         }
     }
 
-    protected function scan(): array
+    public function stop(): void
     {
-        $files = [];
-
-        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->path)) as $item) {
-            if ($item->isDir()) {
-                continue;
-            }
-
-            if (str_starts_with($item->getFilename(), '.')) {
-                continue;
-            }
-
-            $files[$item->getPathname()] = $item->getMTime();
+        if ($this->stopped) {
+            return;
         }
 
-        return $files;
+        foreach ($this->watchers as $wd) {
+            inotify_rm_watch($this->fd, $wd);
+        }
+
+        fclose($this->fd);
+
+        $this->stopped = true;
+    }
+
+    public function __destruct()
+    {
+        $this->stop();
     }
 }

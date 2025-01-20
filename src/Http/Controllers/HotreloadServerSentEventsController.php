@@ -38,6 +38,7 @@ class HotreloadServerSentEventsController
                 }
 
                 if (connection_aborted()) {
+                    $watchers->stop();
                     break;
                 }
 
