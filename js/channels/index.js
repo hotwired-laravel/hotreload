@@ -8,6 +8,14 @@ export class ServerSentEventsChannel {
   static async start() {
     const sse = new EventSource("/hotwired-laravel-hotreload/sse");
 
+    sse.addEventListener(
+      "tick",
+      () => {
+        document.body.setAttribute("data-hotwire-hotreload-ready", "true");
+      },
+      { once: true },
+    );
+
     sse.addEventListener("reload_html", (event) => {
       const data = JSON.parse(event.data);
 
