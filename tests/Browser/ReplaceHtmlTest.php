@@ -2,8 +2,8 @@
 
 namespace Tests\Browser;
 
-use Laravel\Dusk\Browser;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Browser;
 use Tests\BrowserTestCase;
 
 use function Orchestra\Testbench\workbench_path;

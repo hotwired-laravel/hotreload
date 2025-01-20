@@ -5,7 +5,6 @@ namespace Tests;
 use Exception;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Sleep;
-use Laravel\Dusk\Browser;
 use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\Dusk\TestCase;
 use Override;
@@ -44,6 +43,18 @@ class BrowserTestCase extends TestCase
         $this->restoreChangedFiles();
 
         parent::tearDown();
+    }
+
+    /**
+     * Create a new Browser instance.
+     *
+     * @param  \Facebook\WebDriver\Remote\RemoteWebDriver  $driver
+     * @return \Tests\Browser
+     */
+    #[Override]
+    protected function newBrowser($driver)
+    {
+        return new Browser($driver);
     }
 
     #[BeforeClass()]

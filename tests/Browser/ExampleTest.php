@@ -2,8 +2,8 @@
 
 namespace Tests\Browser;
 
-use Laravel\Dusk\Browser;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Browser;
 use Tests\BrowserTestCase;
 
 class ExampleTest extends BrowserTestCase
@@ -13,7 +13,8 @@ class ExampleTest extends BrowserTestCase
     {
         $this->browse(function (Browser $browser) {
             $browser->visit('/')
-                ->assertSee('Hotwired Laravel Hotreload App');
+                ->assertSee('Hotwired Laravel Hotreload App')
+                ->waitForHotreload();
         });
     }
 }
