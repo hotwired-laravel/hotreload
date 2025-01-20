@@ -15,9 +15,8 @@ class CssReloadTest extends BrowserTestCase
     {
         $this->browse(function (Browser $browser) {
             $visit = $browser->visit('/')
+                ->waitForHotreload()
                 ->assertSee('Hotreload App');
-
-            $visit->pause($this->waitingTimeMs());
 
             $this->editFile(workbench_path('resources', 'assets', 'css', 'app.css'), 'visible', 'hidden');
 
@@ -30,9 +29,8 @@ class CssReloadTest extends BrowserTestCase
     {
         $this->browse(function (Browser $browser) {
             $visit = $browser->visit('/')
+                ->waitForHotreload()
                 ->assertSee('Hotreload App');
-
-            $visit->pause($this->waitingTimeMs());
 
             $this->addFile(workbench_path('resources', 'assets', 'css', 'other.css'), <<<'CSS'
             body {
