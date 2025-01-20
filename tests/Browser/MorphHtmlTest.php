@@ -14,7 +14,7 @@ class MorphHtmlTest extends BrowserTestCase
     public function reloads_html(): void
     {
         $this->browse(function (Browser $browser) {
-            $visit = $browser->visit('/?reload_method=morph')->waitForHotreload();
+            $visit = $browser->visit('/?reload_method=morph');
 
             $visit->assertSee('REPLACE_HTML');
 

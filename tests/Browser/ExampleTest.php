@@ -13,8 +13,7 @@ class ExampleTest extends BrowserTestCase
     {
         $this->browse(function (Browser $browser) {
             $browser->visit('/')
-                ->assertSee('Hotwired Laravel Hotreload App')
-                ->waitForHotreload();
+                ->assertSee('Hotwired Laravel Hotreload App');
         });
     }
 }

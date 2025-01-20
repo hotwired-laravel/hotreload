@@ -15,7 +15,6 @@ class StimulusReloadTest extends BrowserTestCase
     {
         $this->browse(function (Browser $browser) {
             $visit = $browser->visit('/')
-                ->waitForHotreload()
                 ->waitForTextIn('#replace', '__REPLACED_STIMULUS__')
                 ->assertSee('__REPLACED_STIMULUS__');
 
@@ -31,7 +30,6 @@ class StimulusReloadTest extends BrowserTestCase
     {
         $this->browse(function (Browser $browser) {
             $visit = $browser->visit('/')
-                ->waitForHotreload()
                 ->waitForTextIn('#replace', '__REPLACED_STIMULUS__')
                 ->assertSee('__REPLACED_STIMULUS__');
 
@@ -56,7 +54,6 @@ class StimulusReloadTest extends BrowserTestCase
     {
         $this->browse(function (Browser $browser) {
             $visit = $browser->visit('/')
-                ->waitForHotreload()
                 ->waitForText('__REPLACED_STIMULUS__');
 
             $this->assertNotNull($visit->element('[data-dummy-version]'));

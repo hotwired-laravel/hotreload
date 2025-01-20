@@ -14,9 +14,7 @@ class ReplaceHtmlTest extends BrowserTestCase
     public function reloads_html(): void
     {
         $this->browse(function (Browser $browser) {
-            $visit = $browser->visit('/')
-                ->waitForHotreload()
-                ->assertSee('REPLACE_HTML');
+            $visit = $browser->visit('/')->assertSee('REPLACE_HTML');
 
             $this->editFile(workbench_path('resources', 'views', 'hello.blade.php'), 'REPLACE_HTML', 'Amazing!');
 
@@ -28,9 +26,7 @@ class ReplaceHtmlTest extends BrowserTestCase
     public function reloads_when_recursive_file_changes(): void
     {
         $this->browse(function (Browser $browser) {
-            $visit = $browser->visit('/')
-                ->waitForHotreload()
-                ->assertSee('REPLACE_NESTED');
+            $visit = $browser->visit('/')->assertSee('REPLACE_NESTED');
 
             $this->editFile(workbench_path('resources', 'views', 'components', 'test.blade.php'), 'REPLACE_NESTED', 'Awesome!');
 

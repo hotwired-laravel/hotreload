@@ -14,9 +14,7 @@ class CssReloadTest extends BrowserTestCase
     public function reloads_css(): void
     {
         $this->browse(function (Browser $browser) {
-            $visit = $browser->visit('/')
-                ->waitForHotreload()
-                ->assertSee('Hotreload App');
+            $visit = $browser->visit('/')->assertSee('Hotreload App');
 
             $this->editFile(workbench_path('resources', 'assets', 'css', 'app.css'), 'visible', 'hidden');
 
@@ -28,9 +26,7 @@ class CssReloadTest extends BrowserTestCase
     public function loads_new_stylesheets(): void
     {
         $this->browse(function (Browser $browser) {
-            $visit = $browser->visit('/')
-                ->waitForHotreload()
-                ->assertSee('Hotreload App');
+            $visit = $browser->visit('/')->assertSee('Hotreload App');
 
             $this->addFile(workbench_path('resources', 'assets', 'css', 'other.css'), <<<'CSS'
             body {
