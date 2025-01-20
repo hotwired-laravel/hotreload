@@ -26,6 +26,10 @@ class HotreloadServerSentEventsController
                 $this->events[] = $event;
             });
 
+            register_shutdown_function(function () use ($watchers) {
+                $watchers->stop();
+            });
+
             while (true) {
                 $watchers->tick();
 
