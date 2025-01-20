@@ -102,9 +102,4 @@ class BrowserTestCase extends TestCase
 
         @unlink($original);
     }
-
-    protected function waitingTimeMs(): int
-    {
-        return env('BROWSER_TESTS_SLEEP_MS', 300);
-    }
 }

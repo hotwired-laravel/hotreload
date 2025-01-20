@@ -63,9 +63,7 @@ class StimulusReloadTest extends BrowserTestCase
 
             $this->deleteFile(workbench_path('resources', 'assets', 'js', 'controllers', 'dummy_controller.js'));
 
-            $visit->pause($this->waitingTimeMs());
-
-            $this->assertNull($visit->element('[data-dummy-version]'), 'Controller was not disconnected');
+            $visit->waitUsing(5, 100, fn () => $visit->element('[data-dummy-version]') === null);
         });
     }
 }
