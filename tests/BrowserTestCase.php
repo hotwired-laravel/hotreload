@@ -28,6 +28,8 @@ class BrowserTestCase extends TestCase
     #[Override]
     protected function setUp(): void
     {
+        $this->waitForServerToStop();
+
         parent::setUp();
 
         Browser::$waitSeconds = env('CI') ? 10 : Browser::$waitSeconds;
