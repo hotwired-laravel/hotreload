@@ -1,13 +1,13 @@
 <?php
 
-namespace HotwiredLaravel\Hotreload;
+namespace HotwiredLaravel\Hotreload\Watchers;
 
 use Closure;
 use HotwiredLaravel\Hotreload\Contracts\FileWatcher as ContractsFileWatcher;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
-class FileWatcher implements ContractsFileWatcher
+class InotifyFileWatcher implements ContractsFileWatcher
 {
     private $fd;
     private $watchers = [];
