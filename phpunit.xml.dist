@@ -22,6 +22,7 @@
         <env name="APP_KEY" value="a2ps3dFoNmyehsm7r0VFZ0Iq64hwBpqI" />
         <env name="CACHE_STORE" value="file"/>
         <env name="SESSION_DRIVER" value="file"/>
+        <env name="PHP_CLI_SERVER_WORKERS" value="6"/>
     </php>
     <source>
         <include>
