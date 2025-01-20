@@ -4,6 +4,7 @@ namespace Tests;
 
 use Exception;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Sleep;
 use Laravel\Dusk\Browser;
 use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\Dusk\TestCase;
@@ -23,12 +24,16 @@ class BrowserTestCase extends TestCase
 
     protected array $deletedFiles = [];
 
+    protected $waitedBeforeChanges = false;
+
     #[Override]
     protected function setUp(): void
     {
         parent::setUp();
 
         Browser::$waitSeconds = env('CI') ? 10 : Browser::$waitSeconds;
+
+        $this->waitedBeforeChanges = false;
 
         $this->cleanUpFixtures();
     }
@@ -100,6 +105,8 @@ class BrowserTestCase extends TestCase
 
     protected function editFile(string $original, string $search, string $replace): void
     {
+        $this->waitBeforeChanging();
+
         $basename = basename($original);
 
         $moved = package_path('tests', 'fixtures', 'files', $basename);
@@ -113,6 +120,8 @@ class BrowserTestCase extends TestCase
 
     protected function addFile(string $file, string $contents): void
     {
+        $this->waitBeforeChanging();
+
         $this->newFiles[] = $file;
 
         File::put($file, $contents);
@@ -120,6 +129,8 @@ class BrowserTestCase extends TestCase
 
     protected function deleteFile(string $original): void
     {
+        $this->waitBeforeChanging();
+
         $basename = basename($original);
 
         $moved = package_path('tests', 'fixtures', 'files', $basename);
@@ -129,5 +140,13 @@ class BrowserTestCase extends TestCase
         $this->deletedFiles[$moved] = $original;
 
         @unlink($original);
+    }
+
+    protected function waitBeforeChanging(): void
+    {
+        if (env('CI') && ! $this->waitedBeforeChanges) {
+            Sleep::for(500)->milliseconds();
+            $this->waitedBeforeChanges = true;
+        }
     }
 }
