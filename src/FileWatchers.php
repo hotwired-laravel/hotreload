@@ -31,4 +31,9 @@ class FileWatchers implements FileWatcher
             $watcher->stop();
         }
     }
+
+    public function __destruct()
+    {
+        $this->stop();
+    }
 }
