@@ -89,7 +89,7 @@ class Hotreload
             throw HotreloadException::inotifyExtensionMissing();
         }
 
-        return match (config('hotreloading.watcher')) {
+        return match (config('hotreloading.watcher', extension_loaded('inotify') ? 'inotify' : 'simple')) {
             'inotify' => new InotifyFileWatcher($path, $onChange),
             default => new SimpleFileWatcher($path, $onChange),
         };
