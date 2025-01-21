@@ -29,7 +29,7 @@ Don't forget to enable it in your `php.ini`. Since this package is for local dev
 
 use HotwiredLaravel\Hotreload\Hotreload;
 
-if (app()->environment('local')) {
+if (app()->environment('local') && class_exists(Hotreload::class)) {
     Hotreload::withInotifyWatcher();
 }
 ```
@@ -89,7 +89,7 @@ You may configure additional paths by calling the respective method on the `Hotr
 
 use HotwiredLaravel\Hotreload\Hotreload;
 
-if (app()->environment('local')) {
+if (app()->environment('local') && class_exists(Hotreload::class)) {
     Hotreload::addHtmlPath(resource_path('images'));
     Hotreload::addCssPath(resource_path('sass'));
     Hotreload::addStimulusPath(resource_path('js/bridge'));
