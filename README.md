@@ -16,6 +16,24 @@ composer require hotwired-laravel/hotreload --dev
 
 That's it!
 
+By default, a simple file watcher will be used. There's another file watcher that is more efficient but requires the [inotify](https://www.php.net/inotify-init) extension, which you may install via PECL:
+
+```bash
+pecl install inotify
+```
+
+Don't forget to enable it in your `php.ini`. Since this package is for local development only, you'll only need that extension locally. Once you have the extension installed and enabled, you may turn on the inotify file watcher by calling this code in your `AppServiceProvider@boot` method (don't forget to wrap it for local env only):
+
+```php
+<?php
+
+use HotwiredLaravel\Hotreload\Hotreload;
+
+if (app()->environment('local')) {
+    Hotreload::withInotifyWatcher();
+}
+```
+
 ### Hot it works
 
 It uses [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) to detect changes in the application files and trigger a reload. The package registers a new route that is responsible for scanning folders looking for changes and sending events to the browser when a change is detected depending on the type of watcher:
@@ -64,14 +82,16 @@ By default, the package will watch for changes on a few default directories (you
 | CSS Paths | Paths where file changes should trigger a CSS reloading. By default: `resources/css` and `public/dist/css` (if exists). |
 | Stimulus Paths | Paths where file changes should trigger a Stimulus reloading. By default: `resources/js/controllers` (if exists). |
 
-You may configure additional paths by calling the respective method on the `Hotreload` class in your `AppServiceProvider@boot` method:
+You may configure additional paths by calling the respective method on the `Hotreload` class in your `AppServiceProvider@boot` method (don't forget to wrap it for local env only):
 
 ```php
 <?php
 
 use HotwiredLaravel\Hotreload\Hotreload;
 
-Hotreload::addHtmlPath(resource_path('images'));
-Hotreload::addCssPath(resource_path('sass'));
-Hotreload::addStimulusPath(resource_path('js/bridge'));
+if (app()->environment('local')) {
+    Hotreload::addHtmlPath(resource_path('images'));
+    Hotreload::addCssPath(resource_path('sass'));
+    Hotreload::addStimulusPath(resource_path('js/bridge'));
+}
 ```

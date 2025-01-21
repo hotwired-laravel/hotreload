@@ -19,9 +19,11 @@
         "tightenco/duster": "^3.1"
     },
     "require": {
-        "ext-inotify": "*",
         "illuminate/support": "^11.36",
         "illuminate/http": "^11.36"
+    },
+    "suggest": {
+        "ext-inotify": "Required for a better performance."
     },
     "config": {
         "sort-packages": true
@@ -54,7 +56,7 @@
         "serve": [
             "Composer\\Config::disableProcessTimeout",
             "@build",
-            "export PHP_CLI_SERVER_WORKERS=4",
+            "export PHP_CLI_SERVER_WORKERS=6",
             "@php vendor/bin/testbench serve --ansi"
         ]
     }

@@ -2,7 +2,6 @@
 
 namespace Tests;
 
-use Exception;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Sleep;
@@ -10,7 +9,6 @@ use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\Dusk\Options;
 use Orchestra\Testbench\Dusk\TestCase;
 use Override;
-use PHPUnit\Framework\Attributes\BeforeClass;
 use RecursiveDirectoryIterator;
 
 use function Orchestra\Testbench\package_path;
@@ -75,32 +73,6 @@ class BrowserTestCase extends TestCase
     protected function newBrowser($driver)
     {
         return new Browser($driver);
-    }
-
-    #[BeforeClass()]
-    protected function waitForServerToStop()
-    {
-        $i = 0;
-
-        while ($this->isServerUp()) {
-            sleep(1);
-            $i++;
-
-            if ($i >= 5) {
-                throw new Exception('Waited too long for server to stop.');
-            }
-        }
-    }
-
-    protected function isServerUp()
-    {
-        if ($socket = @fsockopen('127.0.0.1', 8001, $errorNumber, $errorString, $timeout = 1)) {
-            fclose($socket);
-
-            return true;
-        }
-
-        return false;
     }
 
     protected function cleanUpFixtures(): void
