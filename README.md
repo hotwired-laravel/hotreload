@@ -22,7 +22,9 @@ By default, a simple file watcher will be used. There's another file watcher tha
 pecl install inotify
 ```
 
-Don't forget to enable it in your `php.ini`. Since this package is for local development only, you'll only need that extension locally. Once you have the extension installed and enabled, you may turn on the inotify file watcher by calling this code in your `AppServiceProvider@boot` method (don't forget to wrap it for local env only):
+Don't forget to enable it in your `php.ini`. Since this package is for local development only, you'll only need that extension locally. Once you have the extension installed and enabled, the package should automatically pick the correct file watcher.
+
+Optionally, you may force the use of a specific file watcher by calling this code in your `AppServiceProvider@boot` method (don't forget to wrap it for local env only):
 
 ```php
 <?php
@@ -31,6 +33,10 @@ use HotwiredLaravel\Hotreload\Hotreload;
 
 if (app()->environment('local') && class_exists(Hotreload::class)) {
     Hotreload::withInotifyWatcher();
+
+    // or the simple one...
+
+    Hotreload::withSimpleWatcher();
 }
 ```
 
