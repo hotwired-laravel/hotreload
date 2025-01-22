@@ -27,6 +27,16 @@ class BrowserTestCase extends TestCase
     protected $waitedBeforeChanges = false;
 
     #[Override]
+    public static function setUpBeforeClass(): void
+    {
+        (new static('test'))->waitForServerToStop();
+
+        parent::setUpBeforeClass();
+
+        TestRuns::reset();
+    }
+
+    #[Override]
     protected function setUp(): void
     {
         $this->afterApplicationCreated(function () {
@@ -45,9 +55,13 @@ class BrowserTestCase extends TestCase
 
         parent::setUp();
 
-        static::flushDuskServer();
-        $this->waitForServerToStop();
-        static::startServing();
+        TestRuns::increment();
+
+        if (TestRuns::runs() + 2 >= intval(env('PHP_CLI_SERVER_WORKERS', 1))) {
+            static::flushDuskServer();
+            $this->waitForServerToStop();
+            static::startServing();
+        }
     }
 
     #[Override]
