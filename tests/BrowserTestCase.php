@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use Exception;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Sleep;
@@ -43,6 +44,10 @@ class BrowserTestCase extends TestCase
         $this->cleanUpFixtures();
 
         parent::setUp();
+
+        static::flushDuskServer();
+        $this->waitForServerToStop();
+        static::startServing();
     }
 
     #[Override]
@@ -50,12 +55,49 @@ class BrowserTestCase extends TestCase
     {
         $this->restoreChangedFiles();
 
+        $this->closeAll();
+
         parent::tearDown();
     }
 
     public static function defineWebDriverOptions()
     {
         Options::windowSize(1024, 768);
+    }
+
+    protected function waitForServerToStart()
+    {
+        $i = 0;
+        while (! $this->isServerUp()) {
+            sleep(1);
+            $i++;
+            if ($i >= 5) {
+                throw new Exception('Waited too long for server to start.');
+            }
+        }
+    }
+
+    protected function waitForServerToStop()
+    {
+        $i = 0;
+        while ($this->isServerUp()) {
+            sleep(1);
+            $i++;
+            if ($i >= 5) {
+                throw new Exception('Waited too long for server to stop.');
+            }
+        }
+    }
+
+    protected function isServerUp()
+    {
+        if ($socket = @fsockopen(static::getBaseServeHost(), static::getBaseServePort(), timeout: 1)) {
+            fclose($socket);
+
+            return true;
+        }
+
+        return false;
     }
 
     protected function clearViews(): void
