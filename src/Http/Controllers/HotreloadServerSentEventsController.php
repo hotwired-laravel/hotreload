@@ -31,6 +31,11 @@ class HotreloadServerSentEventsController
             });
 
             while (true) {
+                if (connection_aborted()) {
+                    $watchers->stop();
+                    break;
+                }
+
                 $watchers->tick();
 
                 $this->sendEvents();
@@ -41,12 +46,8 @@ class HotreloadServerSentEventsController
                     $ticks = 0;
                 }
 
-                if (connection_aborted()) {
-                    $watchers->stop();
-                    break;
-                }
-
                 $ticks++;
+
                 Sleep::for(50)->milliseconds();
             }
         }, headers: [
