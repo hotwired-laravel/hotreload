@@ -56,7 +56,7 @@
         "serve": [
             "Composer\\Config::disableProcessTimeout",
             "@build",
-            "export PHP_CLI_SERVER_WORKERS=6",
+            "export PHP_CLI_SERVER_WORKERS=4",
             "@php vendor/bin/testbench serve --ansi"
         ]
     }
