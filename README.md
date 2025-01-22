@@ -42,7 +42,7 @@ if (app()->environment('local') && class_exists(Hotreload::class)) {
 
 ### Hot it works
 
-It uses [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) to detect changes in the application files and trigger a reload. The package registers a new route that is responsible for scanning folders looking for changes and sending events to the browser when a change is detected depending on the type of watcher:
+The package injects a script into your application via a middleware. That script will start an `EventSource` subscribed to a [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) (aka. SSE) that will start watching files for changes in the configured directory. There are a couple of reloaders which are activated depending on which directory you configured (or the default ones):
 
 - HTML files
 - CSS
@@ -57,14 +57,13 @@ This package was built for Turbo Laravel, so it expects that you're using [Impor
 
 ### Configuration
 
-
 #### HTML Replacing Method
 
 By default, it will using morphing to replace HTML changes. You may want to use HTML replace instead of morphing on some pages that are more JS-heavy (like if you have a rich text editor like [Trix](https://trix-editor.org/) on it, for instance). To do so, you may control this on a per-page basis using a meta tag somewhere on that page's view:
 
 ```blade
 @env('local')
-<meta name="hotwire-hotreloading:html-reload-method" content="morph">
+<meta name="hotwire-hotreload:html-reload-method" content="morph">
 @endenv
 ```
 
@@ -74,7 +73,7 @@ If you want to, you may enable logging with a meta tag on the page (you may plac
 
 ```blade
 @env('local')
-<meta name="hotwire-hotreloading:logging" content="true">
+<meta name="hotwire-hotreload:logging" content="true">
 @endenv
 ```
 
