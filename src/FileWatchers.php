@@ -32,6 +32,11 @@ class FileWatchers implements FileWatcher
         }
     }
 
+    public function all(): array
+    {
+        return $this->watchers;
+    }
+
     public function __destruct()
     {
         $this->stop();

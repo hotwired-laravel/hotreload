@@ -63,7 +63,7 @@ class InotifyFileWatcher implements ContractsFileWatcher
             @inotify_rm_watch($this->fd, $wd);
         }
 
-        fclose($this->fd);
+        $this->fd && fclose($this->fd);
 
         $this->stopped = true;
     }

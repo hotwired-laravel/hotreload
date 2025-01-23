@@ -20,12 +20,12 @@ class Hotreload
 
     public static function withInotifyWatcher(): void
     {
-        config()->set('hotreloading.watcher', 'inotify');
+        config()->set('hotwire-hotreload.watcher', 'inotify');
     }
 
     public static function withSimpleWatcher(): void
     {
-        config()->set('hotreloading.watcher', 'simple');
+        config()->set('hotwire-hotreload.watcher', 'simple');
     }
 
     public static function addHtmlPath(string $path): void
@@ -85,11 +85,11 @@ class Hotreload
 
     protected static function watcherFor(string $path, Closure $onChange): FileWatcher
     {
-        if (config('hotreloading.watcher') === 'inotify' && ! extension_loaded('inotify')) {
+        if (config('hotwire-hotreload.watcher') === 'inotify' && ! extension_loaded('inotify')) {
             throw HotreloadException::inotifyExtensionMissing();
         }
 
-        return match (config('hotreloading.watcher', extension_loaded('inotify') ? 'inotify' : 'simple')) {
+        return match (config('hotwire-hotreload.watcher', extension_loaded('inotify') ? 'inotify' : 'simple')) {
             'inotify' => new InotifyFileWatcher($path, $onChange),
             default => new SimpleFileWatcher($path, $onChange),
         };
