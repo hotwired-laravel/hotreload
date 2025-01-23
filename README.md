@@ -57,6 +57,15 @@ This package was built for Turbo Laravel, so it expects that you're using [Impor
 
 ### Configuration
 
+#### On PHP Processes
+
+For this to work, we need at least 2 processes, since the SSE route will cause the process to hang indefinitely. If you're using `php artisan serve` (which [Laravel Sail](https://github.com/laravel/sail/blob/1.x/runtimes/8.4/Dockerfile#L14) uses by default). For that reason, make sure you set the number of PHP processes on your `.env` file:
+
+```env
+PHP_CLI_SERVER_WORKERS=4
+```
+[Laravel does by default](https://github.com/laravel/laravel/blob/11.x/.env.example#L15) nowadays.
+
 #### HTML Replacing Method
 
 By default, it will using morphing to replace HTML changes. You may want to use HTML replace instead of morphing on some pages that are more JS-heavy (like if you have a rich text editor like [Trix](https://trix-editor.org/) on it, for instance). To do so, you may control this on a per-page basis using a meta tag somewhere on that page's view:
