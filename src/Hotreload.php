@@ -14,9 +14,9 @@ use Illuminate\Support\Facades\Event;
 
 class Hotreload
 {
-    private static $htmlPaths = [];
-    private static $stimulusPaths = [];
-    private static $cssPaths = [];
+    protected static $htmlPaths = [];
+    protected static $stimulusPaths = [];
+    protected static $cssPaths = [];
 
     public static function withInotifyWatcher(): void
     {
@@ -45,24 +45,17 @@ class Hotreload
 
     public static function htmlPaths(): array
     {
-        return array_values(array_filter(array_merge([
-            resource_path('views/'),
-        ], static::$htmlPaths), 'is_dir'));
+        return array_values(array_merge(static::defaultPaths('html'), static::$htmlPaths));
     }
 
     public static function stimulusPaths(): array
     {
-        return array_values(array_filter(array_merge([
-            resource_path('js/controllers/'),
-        ], static::$stimulusPaths), 'is_dir'));
+        return array_values(array_merge(static::defaultPaths('stimulus'), static::$stimulusPaths));
     }
 
     public static function cssPaths(): array
     {
-        return array_values(array_filter(array_merge([
-            resource_path('css/'),
-            public_path('dist/css/'),
-        ], static::$cssPaths), 'is_dir'));
+        return array_values(array_merge(static::defaultPaths('css'), static::$cssPaths));
     }
 
     public static function watchers(): FileWatchers
@@ -81,6 +74,29 @@ class Hotreload
                 onChange: fn ($file) => Event::dispatch(new ReloadCss(str_replace($path, '/', $file)))
             ))->all(),
         ]);
+    }
+
+    public static function resetPaths(): void
+    {
+        static::$cssPaths = static::defaultPaths('css');
+        static::$stimulusPaths = static::defaultPaths('stimulus');
+        static::$htmlPaths = static::defaultPaths('html');
+    }
+
+    protected static function defaultPaths(string $type): array
+    {
+        return [
+            'html' => array_values(array_filter([
+                resource_path('views/'),
+            ], 'is_dir')),
+            'css' => array_values(array_filter([
+                resource_path('css/'),
+                public_path('dist/css/'),
+            ], 'is_dir')),
+            'stimulus' => array_values(array_filter([
+                resource_path('js/controllers/'),
+            ], 'is_dir')),
+        ][$type];
     }
 
     protected static function watcherFor(string $path, Closure $onChange): FileWatcher

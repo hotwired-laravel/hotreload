@@ -21,4 +21,26 @@ class HotreloadTest extends UnitTestCase
 
         $this->assertInstanceOf(SimpleFileWatcher::class, collect(Hotreload::watchers()->all())->first());
     }
+
+    #[Test]
+    public function can_add_paths(): void
+    {
+        $this->assertNotContains(__DIR__, Hotreload::htmlPaths());
+
+        Hotreload::addHtmlPath(__DIR__);
+
+        $this->assertContains(__DIR__, Hotreload::htmlPaths());
+
+        $this->assertNotContains(__DIR__, Hotreload::stimulusPaths());
+
+        Hotreload::addStimulusPath(__DIR__);
+
+        $this->assertContains(__DIR__, Hotreload::stimulusPaths());
+
+        $this->assertNotContains(__DIR__, Hotreload::cssPaths());
+
+        Hotreload::addCssPath(__DIR__);
+
+        $this->assertContains(__DIR__, Hotreload::cssPaths());
+    }
 }

@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Exception;
+use HotwiredLaravel\Hotreload\Hotreload;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Sleep;
@@ -39,6 +40,8 @@ abstract class BrowserTestCase extends TestCase
     #[Override]
     protected function setUp(): void
     {
+        Hotreload::resetPaths();
+
         $this->afterApplicationCreated(function () {
             $this->clearViews();
         });
