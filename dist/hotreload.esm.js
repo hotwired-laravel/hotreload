@@ -983,8 +983,10 @@ var ServerSentEventsChannel = class {
       return reloader.reload(data.path);
     });
     sse.addEventListener("reload_stimulus", (event) => {
-      const data = JSON.parse(event.data);
-      return StimulusReloader.reload(data.path);
+      if (window.Stimulus) {
+        const data = JSON.parse(event.data);
+        return StimulusReloader.reload(data.path);
+      }
     });
     sse.addEventListener("reload_css", (event) => {
       const data = JSON.parse(event.data);
