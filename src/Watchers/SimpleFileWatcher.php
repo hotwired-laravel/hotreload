@@ -61,6 +61,10 @@ class SimpleFileWatcher implements FileWatcher
 
     protected function scan(): array
     {
+        if (! is_dir($this->path)) {
+            return [$this->path => file_exists($this->path) ? filemtime($this->path) : 0];
+        }
+
         $files = [];
 
         foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->path)) as $item) {

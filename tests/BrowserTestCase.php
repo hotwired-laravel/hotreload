@@ -14,7 +14,7 @@ use RecursiveDirectoryIterator;
 
 use function Orchestra\Testbench\package_path;
 
-class BrowserTestCase extends TestCase
+abstract class BrowserTestCase extends TestCase
 {
     use WithWorkbench;
 
