@@ -43,4 +43,15 @@ class HotreloadTest extends UnitTestCase
 
         $this->assertContains(__DIR__, Hotreload::cssPaths());
     }
+
+    #[Test]
+    public function resets_paths(): void
+    {
+        $before = Hotreload::htmlPaths();
+
+        Hotreload::addHtmlPath(__DIR__);
+        Hotreload::resetPaths();
+
+        $this->assertEquals($before, Hotreload::htmlPaths());
+    }
 }
