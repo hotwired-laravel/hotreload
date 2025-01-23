@@ -40,8 +40,6 @@ abstract class BrowserTestCase extends TestCase
     #[Override]
     protected function setUp(): void
     {
-        Hotreload::resetPaths();
-
         $this->afterApplicationCreated(function () {
             $this->clearViews();
         });
@@ -57,6 +55,8 @@ abstract class BrowserTestCase extends TestCase
         $this->cleanUpFixtures();
 
         parent::setUp();
+
+        Hotreload::resetPaths();
 
         TestRuns::increment();
 
