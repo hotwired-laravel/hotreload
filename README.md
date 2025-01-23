@@ -1,5 +1,17 @@
 ## Hotreload for Turbo Laravel
 
+<div>
+    <a href="https://github.com/hotwired-laravel/hotreload/actions">
+        <img src="https://github.com/hotwired-laravel/hotreload/workflows/tests/badge.svg" alt="Build Status">
+    </a>
+    <a href="https://packagist.org/packages/hotwired-laravel/hotreload">
+        <img src="https://img.shields.io/packagist/v/hotwired-laravel/hotreload" alt="Latest Stable Version">
+    </a>
+    <a href="https://packagist.org/packages/hotwired-laravel/hotreload">
+        <img src="https://img.shields.io/packagist/l/hotwired-laravel/hotreload" alt="License">
+    </a>
+</div>
+
 It enhances development feedback loops by detecting source code changes and updating the page _smoothly_ without requiring manual reloads.
 
 _This package is still under development._
