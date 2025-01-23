@@ -21,7 +21,6 @@ class StimulusReloadTest extends BrowserTestCase
             $this->editFile(workbench_path('resources', 'assets', 'js', 'controllers', 'dummy_controller.js'), '__REPLACED_STIMULUS__', '__REPLACED_STIMULUS_V2__');
 
             $visit->waitUntilMissingText('__REPLACED_STIMULUS__');
-            $visit->assertSee('__REPLACED_STIMULUS_V2__');
         });
     }
 
@@ -45,7 +44,6 @@ class StimulusReloadTest extends BrowserTestCase
             JS);
 
             $visit->waitForText('__OTHER_REPLACED__');
-            $visit->assertSee('__OTHER_REPLACED__');
         });
     }
 

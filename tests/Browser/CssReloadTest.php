@@ -34,7 +34,7 @@ class CssReloadTest extends BrowserTestCase
             }
             CSS);
 
-            $visit->waitUntilMissingText('Hotreload App')->assertDontSee('Hotreload App');
+            $visit->waitUntilMissingText('Hotreload App');
         });
     }
 }
