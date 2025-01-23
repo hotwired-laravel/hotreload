@@ -15,3 +15,5 @@ Route::get('assetpipeline/{file}', function ($file) {
 Route::get('/', function () {
     return view('hello');
 });
+
+Route::redirect('redirect', '/');
