@@ -28,7 +28,7 @@ export class ServerSentEventsChannel {
     });
 
     sse.addEventListener("reload_stimulus", (event) => {
-      if (window.Stimulus) {
+      if (window.Stimulus !== undefined) {
         const data = JSON.parse(event.data);
         return StimulusReloader.reload(data.path);
       }
