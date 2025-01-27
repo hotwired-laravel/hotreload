@@ -38,41 +38,6 @@ var ReplaceHtmlReloader = class {
   }
 };
 
-// js/helpers.js
-function assetNameFromPath(path) {
-  return path.split("/").pop().split(".")[0];
-}
-function pathWithoutAssetDigest(path) {
-  return path.replace(/\?.*$/, "");
-}
-function urlWithParams(urlString, params) {
-  const url = new URL(urlString, window.location.origin);
-  Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.set(key, value);
-  });
-  return url.toString();
-}
-function cacheBustedUrl(urlString) {
-  return urlWithParams(urlString, { reload: Date.now() });
-}
-async function reloadHtmlDocument() {
-  let currentUrl = cacheBustedUrl(
-    urlWithParams(window.location.href, { hotwire_spark: "true" })
-  );
-  const response = await fetch(currentUrl, {
-    headers: { Accept: "text/html" }
-  });
-  if (!response.ok) {
-    throw new Error(`${response.status} when fetching ${currentUrl}`);
-  }
-  const fetchedHTML = await response.text();
-  const parser = new DOMParser();
-  return parser.parseFromString(fetchedHTML, "text/html");
-}
-function getConfigurationProperty(name) {
-  return document.querySelector(`meta[name="hotwire-hotreload:${name}"]`)?.content;
-}
-
 // node_modules/idiomorph/dist/idiomorph.esm.js
 var Idiomorph = function() {
   "use strict";
@@ -786,6 +751,41 @@ var Idiomorph = function() {
   };
 }();
 
+// js/helpers.js
+function assetNameFromPath(path) {
+  return path.split("/").pop().split(".")[0];
+}
+function pathWithoutAssetDigest(path) {
+  return path.replace(/\?.*$/, "");
+}
+function urlWithParams(urlString, params) {
+  const url = new URL(urlString, window.location.origin);
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
+  return url.toString();
+}
+function cacheBustedUrl(urlString) {
+  return urlWithParams(urlString, { reload: Date.now() });
+}
+async function reloadHtmlDocument() {
+  let currentUrl = cacheBustedUrl(
+    urlWithParams(window.location.href, { hotwire_spark: "true" })
+  );
+  const response = await fetch(currentUrl, {
+    headers: { Accept: "text/html" }
+  });
+  if (!response.ok) {
+    throw new Error(`${response.status} when fetching ${currentUrl}`);
+  }
+  const fetchedHTML = await response.text();
+  const parser = new DOMParser();
+  return parser.parseFromString(fetchedHTML, "text/html");
+}
+function getConfigurationProperty(name) {
+  return document.querySelector(`meta[name="hotwire-hotreload:${name}"]`)?.content;
+}
+
 // js/reloaders/stimulus_reloader.js
 var StimulusReloader = class {
   static async reload(changedFilePath) {
@@ -896,7 +896,7 @@ var MorphHtmlReloader = class {
     await this.#reloadStimulus();
   }
   async #reloadHtml() {
-    log("Reload HTML...");
+    log("Reload html with morph...");
     const reloadedDocument = await reloadHtmlDocument();
     this.#updateBody(reloadedDocument.body);
     return reloadedDocument;
@@ -983,7 +983,7 @@ var ServerSentEventsChannel = class {
       return reloader.reload(data.path);
     });
     sse.addEventListener("reload_stimulus", (event) => {
-      if (window.Stimulus) {
+      if (window.Stimulus !== void 0) {
         const data = JSON.parse(event.data);
         return StimulusReloader.reload(data.path);
       }
