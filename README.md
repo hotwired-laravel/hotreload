@@ -84,7 +84,7 @@ By default, it will using morphing to replace HTML changes. You may want to use 
 
 ```blade
 @env('local')
-<meta name="hotwire-hotreload:html-reload-method" content="morph">
+<meta name="hotwire-hotreload:html-reload-method" content="replace">
 @endenv
 ```
 
