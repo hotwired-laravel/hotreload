@@ -207,7 +207,7 @@ abstract class BrowserTestCase extends TestCase
     protected function waitBeforeChanging(): void
     {
         if (env('CI') && ! $this->waitedBeforeChanges) {
-            Sleep::for(1000)->milliseconds();
+            Sleep::for(1)->second();
             $this->waitedBeforeChanges = true;
         }
     }
