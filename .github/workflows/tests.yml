@@ -44,7 +44,13 @@ jobs:
         run: vendor/bin/dusk-updater detect --no-interaction
 
       - name: Execute tests
-        run: vendor/bin/phpunit
+        run: |
+          mkdir -p vendor/orchestra/testbench-dusk/laravel/bootstrap/cache
+          mkdir -p vendor/orchestra/testbench-dusk/laravel/storage/logs
+          chmod -R 777 vendor/orchestra/testbench-dusk/laravel/bootstrap/cache
+          chmod -R 777 vendor/orchestra/testbench-dusk/laravel/storage/logs
+
+          vendor/bin/phpunit
         env:
           PHP_CLI_SERVER_WORKERS: 4
 
