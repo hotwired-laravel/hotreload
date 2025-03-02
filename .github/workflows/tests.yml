@@ -11,12 +11,19 @@ jobs:
   tests:
     runs-on: "ubuntu-latest"
     strategy:
+      fail-fast: true
       matrix:
-        php:
-          - 8.3
-          - 8.4
+        os: [ubuntu-latest]
+        php: [8.2, 8.3, 8.4]
+        laravel: [11.*, 12.*]
+        stability: [prefer-lowest, prefer-stable]
+        include:
+          - laravel: 11.*
+            testbench-dusk: 9.*
+          - laravel: 12.*
+            testbench-dusk: 10.*
 
-    name: PHP:${{ matrix.php }}
+    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
 
     steps:
       - name: Checkout code
@@ -29,15 +36,10 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, sqlite3, pdo_sqlite, pdo_mysql, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo, inotify
           coverage: none
 
-      - name: Install dependencies
-        uses: "ramsey/composer-install@v3"
-        with:
-          dependency-versions: "${{ matrix.dependencies }}"
-          composer-options: "--prefer-dist --no-cache"
-
       - name: Installed dependencies
         run: |
-          composer show -D
+          composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench-dusk:${{ matrix.testbench-dusk }}" --no-interaction --no-update
+          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
 
       - name: Update Chrome
         run: vendor/bin/dusk-updater detect --no-interaction
