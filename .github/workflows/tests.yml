@@ -14,13 +14,11 @@ jobs:
       fail-fast: true
       matrix:
         php: [8.2, 8.3, 8.4]
-        laravel: [11.*, 12.*]
+        laravel: [11.*]
         stability: [prefer-lowest, prefer-stable]
         include:
           - laravel: 11.*
             testbench-dusk: 9.*
-          - laravel: 12.*
-            testbench-dusk: 10.*
 
     name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }}
 
@@ -44,10 +42,7 @@ jobs:
         run: vendor/bin/dusk-updater detect --no-interaction
 
       - name: Execute tests
-        run: |
-          mkdir -p vendor/orchestra/testbench-dusk/laravel/bootstrap/cache
-          chmod -R 777 vendor/orchestra/testbench-dusk/laravel/bootstrap/cache
-          vendor/bin/phpunit
+        run: vendor/bin/phpunit
         env:
           PHP_CLI_SERVER_WORKERS: 4
 
