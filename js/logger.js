@@ -1,7 +1,7 @@
-import HotwireHotreload from "./index.js";
+import config from "./config";
 
 export function log(...messages) {
-  if (HotwireHotreload.config.loggingEnabled) {
+  if (config.loggingEnabled) {
     console.log(`[hotwire hotreload]`, ...messages);
   }
 }

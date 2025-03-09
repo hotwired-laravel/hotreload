@@ -4,7 +4,7 @@ import { StimulusReloader } from "../reloaders/stimulus_reloader.js";
 import { CssReloader } from "../reloaders/css_reloader.js";
 import { assetNameFromPath } from "../helpers.js";
 
-export class ServerSentEventsChannel {
+class ServerSentEventsChannel {
   static async start() {
     const sse = new EventSource("/hotwired-laravel-hotreload/sse");
 
@@ -40,3 +40,5 @@ export class ServerSentEventsChannel {
     });
   }
 }
+
+ServerSentEventsChannel.start();
