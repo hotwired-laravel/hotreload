@@ -18,6 +18,7 @@
 
   // js/logger.js
   function log(...messages) {
+    console.log(config_default, messages);
     if (config_default.loggingEnabled) {
       console.log(`[hotwire hotreload]`, ...messages);
     }
