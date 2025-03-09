@@ -1,6 +1,23 @@
+// js/config.js
+var config = {
+  loggingEnabled: getConfigurationProperty("logging") ?? false,
+  htmlReloadMethod: getConfigurationProperty("html-reload-method")
+};
+document.addEventListener("turbo:load", () => {
+  reloadConfigs();
+});
+function reloadConfigs() {
+  config.loggingEnabled = getConfigurationProperty("logging") ?? false;
+  config.htmlReloadMethod = getConfigurationProperty("html-reload-method");
+}
+function getConfigurationProperty(name) {
+  return document.querySelector(`meta[name="hotwire-hotreload:${name}"]`)?.content;
+}
+var config_default = config;
+
 // js/logger.js
 function log(...messages) {
-  if (js_default.config.loggingEnabled) {
+  if (config_default.loggingEnabled) {
     console.log(`[hotwire hotreload]`, ...messages);
   }
 }
@@ -32,8 +49,7 @@ var ReplaceHtmlReloader = class {
       document.addEventListener("turbo:load", () => resolve(document), {
         once: true
       });
-      window.Turbo.cache.clear();
-      window.Turbo.visit(window.location);
+      window.Turbo.visit(window.location, { action: "replace" });
     });
   }
 };
@@ -66,7 +82,7 @@ var Idiomorph = function() {
       afterHeadMorphed: noOp
     }
   };
-  function morph(oldNode, newContent, config = {}) {
+  function morph(oldNode, newContent, config2 = {}) {
     if (oldNode instanceof Document) {
       oldNode = oldNode.documentElement;
     }
@@ -74,7 +90,7 @@ var Idiomorph = function() {
       newContent = parseContent(newContent);
     }
     let normalizedContent = normalizeContent(newContent);
-    let ctx = createMorphContext(oldNode, normalizedContent, config);
+    let ctx = createMorphContext(oldNode, normalizedContent, config2);
     return morphNormalizedContent(oldNode, normalizedContent, ctx);
   }
   function morphNormalizedContent(oldNode, normalizedNewContent, ctx) {
@@ -409,19 +425,19 @@ var Idiomorph = function() {
   }
   function noOp() {
   }
-  function mergeDefaults(config) {
+  function mergeDefaults(config2) {
     let finalConfig = Object.assign({}, defaults);
-    Object.assign(finalConfig, config);
+    Object.assign(finalConfig, config2);
     finalConfig.callbacks = Object.assign(
       {},
       defaults.callbacks,
-      config.callbacks
+      config2.callbacks
     );
-    finalConfig.head = Object.assign({}, defaults.head, config.head);
+    finalConfig.head = Object.assign({}, defaults.head, config2.head);
     return finalConfig;
   }
-  function createMorphContext(oldNode, newContent, config) {
-    const mergedConfig = mergeDefaults(config);
+  function createMorphContext(oldNode, newContent, config2) {
+    const mergedConfig = mergeDefaults(config2);
     return {
       target: oldNode,
       newContent,
@@ -782,9 +798,6 @@ async function reloadHtmlDocument() {
   const parser = new DOMParser();
   return parser.parseFromString(fetchedHTML, "text/html");
 }
-function getConfigurationProperty(name) {
-  return document.querySelector(`meta[name="hotwire-hotreload:${name}"]`)?.content;
-}
 
 // js/reloaders/stimulus_reloader.js
 var StimulusReloader = class {
@@ -994,34 +1007,11 @@ var ServerSentEventsChannel = class {
     });
   }
 };
+ServerSentEventsChannel.start();
 
 // js/index.js
-var HotwireHotreloadDefaultConfigs = {
-  loggingEnabled: false,
-  htmlReloadMethod: "morph"
-};
 var HotwireHotreload2 = {
-  config: { ...HotwireHotreloadDefaultConfigs }
+  config: config_default
 };
 window.HotwireHotreload = HotwireHotreload2;
-var configProperties = {
-  loggingEnabled: "logging",
-  htmlReloadMethod: "html-reload-method"
-};
-var syncConfigs = async () => {
-  Object.entries(configProperties).forEach(([key, property]) => {
-    HotwireHotreload2.config[key] = getConfigurationProperty(property) ?? HotwireHotreloadDefaultConfigs[key];
-  });
-};
-document.addEventListener("DOMContentLoaded", async () => {
-  await syncConfigs();
-  await ServerSentEventsChannel.start();
-});
-document.addEventListener("turbo:load", async () => {
-  await syncConfigs();
-});
-var js_default = HotwireHotreload2;
-export {
-  js_default as default
-};
 //# sourceMappingURL=hotreload.esm.js.map
