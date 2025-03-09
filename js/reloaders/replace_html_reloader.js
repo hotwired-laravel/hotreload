@@ -31,8 +31,7 @@ export class ReplaceHtmlReloader {
       document.addEventListener("turbo:load", () => resolve(document), {
         once: true,
       });
-      window.Turbo.cache.clear();
-      window.Turbo.visit(window.location);
+      window.Turbo.visit(window.location, { action: "replace" });
     });
   }
 }
