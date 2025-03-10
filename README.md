@@ -76,7 +76,11 @@ For this to work, we need at least 2 processes, since the SSE route will cause t
 ```env
 PHP_CLI_SERVER_WORKERS=4
 ```
-[Laravel does that by default](https://github.com/laravel/laravel/blob/11.x/.env.example#L15) nowadays.
+[Laravel does that by default](https://github.com/laravel/laravel/blob/11.x/.env.example#L15) nowadays. You must also provide the `--no-reload` option to the serve command:
+
+```bash
+php artisan serve --no-reload
+```
 
 #### HTML Replacing Method
 
