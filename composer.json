@@ -56,8 +56,8 @@
         "serve": [
             "Composer\\Config::disableProcessTimeout",
             "@build",
-            "export PHP_CLI_SERVER_WORKERS=4",
-            "@php vendor/bin/testbench serve --ansi"
+            "@putenv PHP_CLI_SERVER_WORKERS=4",
+            "@php vendor/bin/testbench serve --ansi --no-reload"
         ]
     }
 }
