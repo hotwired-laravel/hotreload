@@ -83,6 +83,11 @@ class Hotreload
         static::$htmlPaths = static::defaultPaths('html');
     }
 
+    public static function getConfiguredWatcher(): string
+    {
+        return config('hotwire-hotreload.watcher', extension_loaded('inotify') ? 'inotify' : 'simple');
+    }
+
     protected static function defaultPaths(string $type): array
     {
         return [
@@ -101,11 +106,11 @@ class Hotreload
 
     protected static function watcherFor(string $path, Closure $onChange): FileWatcher
     {
-        if (config('hotwire-hotreload.watcher') === 'inotify' && ! extension_loaded('inotify')) {
+        if (static::getConfiguredWatcher() === 'inotify' && ! extension_loaded('inotify')) {
             throw HotreloadException::inotifyExtensionMissing();
         }
 
-        return match (config('hotwire-hotreload.watcher', extension_loaded('inotify') ? 'inotify' : 'simple')) {
+        return match (static::getConfiguredWatcher()) {
             'inotify' => new InotifyFileWatcher($path, $onChange),
             default => new SimpleFileWatcher($path, $onChange),
         };

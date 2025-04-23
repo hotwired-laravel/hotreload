@@ -15,10 +15,8 @@ jobs:
       fail-fast: true
       matrix:
         php: [8.3, 8.4]
-        laravel: [11.*, 12.*]
+        laravel: [12.*]
         include:
-          - laravel: 11.*
-            dependencies: "laravel/framework:11.*"
           - laravel: 12.*
             dependencies: "laravel/framework:12.*"
 

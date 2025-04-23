@@ -4,6 +4,7 @@ namespace HotwiredLaravel\Hotreload\Http\Controllers;
 
 use HotwiredLaravel\Hotreload\Events\HotreloadEvent;
 use HotwiredLaravel\Hotreload\Hotreload;
+use Illuminate\Http\StreamedEvent;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Sleep;
@@ -15,10 +16,8 @@ class HotreloadServerSentEventsController
 
     public function __invoke()
     {
-        return Response::stream(function () {
+        return Response::eventStream(function () {
             $watchers = Hotreload::watchers();
-
-            $watchers->boot();
 
             $ticks = 0;
 
@@ -26,9 +25,12 @@ class HotreloadServerSentEventsController
                 $this->events[] = $event;
             });
 
-            register_shutdown_function(function () use ($watchers) {
-                $watchers->stop();
-            });
+            $watchers->boot();
+
+            yield new StreamedEvent(
+                event: 'booted',
+                data: ['watcher' => Hotreload::getConfiguredWatcher()],
+            );
 
             while (true) {
                 if (connection_aborted()) {
@@ -38,10 +40,20 @@ class HotreloadServerSentEventsController
 
                 $watchers->tick();
 
-                $this->sendEvents();
+                foreach ($this->events as $event) {
+                    yield new StreamedEvent(
+                        event: $event->eventName(),
+                        data: $event->eventData(),
+                    );
+                }
+
+                $this->events = [];
 
                 if ($ticks === 0 || $ticks === 100) {
-                    $this->send('tick', ['time' => time()]);
+                    yield new StreamedEvent(
+                        event: 'tick',
+                        data: ['time' => time()],
+                    );
 
                     $ticks = 0;
                 }
@@ -50,34 +62,6 @@ class HotreloadServerSentEventsController
 
                 Sleep::for(50)->milliseconds();
             }
-        }, headers: [
-            'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache',
-            'Connection' => 'keep-alive',
-            'X-Accel-Buffering' => 'no',
-        ]);
-    }
-
-    private function send($event, $data): void
-    {
-        $data = json_encode($data, JSON_UNESCAPED_SLASHES);
-
-        echo "event: {$event}\n";
-        echo "data: {$data}\n\n";
-
-        if (ob_get_contents()) {
-            ob_end_flush();
-        }
-
-        flush();
-    }
-
-    private function sendEvents(): void
-    {
-        foreach ($this->events as $event) {
-            $this->send($event->eventName(), $event->eventData());
-        }
-
-        $this->events = [];
+        });
     }
 }
