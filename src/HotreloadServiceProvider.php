@@ -45,7 +45,13 @@ class HotreloadServiceProvider extends ServiceProvider
     private function serveFile(string $file): Closure
     {
         return function () use ($file) {
-            return Response::file($file);
+            return Response::file($file, [
+                'Content-Type' => match ((string) str($file)->afterLast('.')) {
+                    'js' => 'text/javascript',
+                    'map' => 'application/json',
+                    default => 'text/plain',
+                },
+            ]);
         };
     }
 
