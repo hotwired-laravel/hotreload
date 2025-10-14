@@ -12,8 +12,19 @@ use Illuminate\Support\ServiceProvider;
 
 class HotreloadServiceProvider extends ServiceProvider
 {
+    public function register()
+    {
+        $this->mergeConfigFrom(
+            __DIR__ . '/../config/hotreload.php', 'hotreload'
+        );
+    }
+
     public function boot()
     {
+        if (! config('hotreload.enabled')) {
+            return;
+        }
+
         $this->configureMiddleware();
         $this->configureJsFileRoutes();
         $this->configureServerSentEventsRoute();
