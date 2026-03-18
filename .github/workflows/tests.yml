@@ -14,11 +14,13 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        php: [8.3, 8.4]
-        laravel: [12.*]
+        php: [8.3, 8.4, 8.5]
+        laravel: [12.*, 13.*]
         include:
           - laravel: 12.*
             dependencies: "laravel/framework:12.*"
+          - laravel: 13.*
+            dependencies: "laravel/framework:13.*"
 
     name: P${{ matrix.php }} - L${{ matrix.laravel }}
 
