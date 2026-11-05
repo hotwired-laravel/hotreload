@@ -1,7 +1,8 @@
 // js/config.js
 var config = {
   loggingEnabled: getConfigurationProperty("logging") ?? false,
-  htmlReloadMethod: getConfigurationProperty("html-reload-method")
+  htmlReloadMethod: getConfigurationProperty("html-reload-method"),
+  url: getConfigurationProperty("url")
 };
 document.addEventListener("turbo:load", () => {
   reloadConfigs();
@@ -980,13 +981,30 @@ var CssReloader = class {
 };
 
 // js/channels/index.js
+var FALLBACK_URL = "/hotwired-laravel-hotreload/sse";
 var ServerSentEventsChannel = class {
   static async start() {
-    const sse = new EventSource("/hotwired-laravel-hotreload/sse");
+    if (!config_default.url) {
+      return this.connect(FALLBACK_URL);
+    }
+    const sse = this.connect(config_default.url);
+    let opened = false;
+    sse.addEventListener("open", () => opened = true, { once: true });
+    sse.addEventListener("error", () => {
+      if (opened || sse.readyState === EventSource.OPEN)
+        return;
+      log(`Couldn't connect to the hotreload daemon at ${config_default.url}, falling back to ${FALLBACK_URL}`);
+      sse.close();
+      this.connect(FALLBACK_URL);
+    }, { once: true });
+  }
+  static connect(url) {
+    const sse = new EventSource(url);
     sse.addEventListener(
       "tick",
       () => {
         document.body.setAttribute("data-hotwire-hotreload-ready", "true");
+        document.body.setAttribute("data-hotwire-hotreload-url", url);
       },
       { once: true }
     );
@@ -1005,6 +1023,7 @@ var ServerSentEventsChannel = class {
       const data = JSON.parse(event.data);
       return CssReloader.reload(new RegExp(assetNameFromPath(data.path)));
     });
+    return sse;
   }
 };
 ServerSentEventsChannel.start();

@@ -3,9 +3,12 @@
 namespace HotwiredLaravel\Hotreload;
 
 use Closure;
+use HotwiredLaravel\Hotreload\Console\HotreloadServeCommand;
 use HotwiredLaravel\Hotreload\Http\Controllers\HotreloadServerSentEventsController;
 use HotwiredLaravel\Hotreload\Http\Middleware\HotreloadMiddleware;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -17,17 +20,62 @@ class HotreloadServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(
             __DIR__ . '/../config/hotreload.php', 'hotreload'
         );
+
+        $this->app->singleton(DaemonLauncher::class);
     }
 
     public function boot()
     {
-        if (! config('hotreload.enabled')) {
+        if ($this->app->runningInConsole()) {
+            $this->commands([HotreloadServeCommand::class]);
+        }
+
+        if (! Hotreload::enabled()) {
             return;
         }
 
+        $this->configureDaemonForServeCommand();
         $this->configureMiddleware();
         $this->configureJsFileRoutes();
         $this->configureServerSentEventsRoute();
+    }
+
+    /**
+     * Starts the hotreload daemon alongside `php artisan serve`, which also
+     * covers `php artisan dev` and `composer dev` (they run `serve`).
+     */
+    private function configureDaemonForServeCommand(): void
+    {
+        if (! $this->app->runningInConsole()) {
+            return;
+        }
+
+        Event::listen(function (CommandStarting $event) {
+            if ($event->command !== 'serve') {
+                return;
+            }
+
+            $port = (int) config('hotreload.port', 0);
+
+            $launcher = $this->app->make(DaemonLauncher::class);
+
+            // Random ports inside containers (like Sail) can't be published, so we fall back
+            // to the in-process SSE route unless a port was explicitly configured...
+            if ($port === 0 && $launcher->runningInContainer()) {
+                return;
+            }
+
+            $launcher->launch(
+                host: $this->daemonHostFor((string) $event->input->getParameterOption('--host', env('SERVER_HOST', '127.0.0.1'))),
+                port: $port,
+                parentPid: getmypid(),
+            );
+        });
+    }
+
+    private function daemonHostFor(string $serveHost): string
+    {
+        return in_array($serveHost, ['', 'localhost', '127.0.0.1'], true) ? '127.0.0.1' : '0.0.0.0';
     }
 
     private function configureMiddleware(): void

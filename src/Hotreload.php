@@ -18,6 +18,55 @@ class Hotreload
     protected static $stimulusPaths = [];
     protected static $cssPaths = [];
 
+    public static function enabled(): bool
+    {
+        return (bool) config('hotreload.enabled');
+    }
+
+    public static function hotFile(): string
+    {
+        return storage_path('framework/hotreload.json');
+    }
+
+    /**
+     * Returns the running daemon's info (port and pid), or null when no daemon is running.
+     *
+     * @return array{port: int, pid: int}|null
+     */
+    public static function runningDaemon(): ?array
+    {
+        if (! is_file($file = static::hotFile())) {
+            return null;
+        }
+
+        $daemon = json_decode((string) @file_get_contents($file), true);
+
+        if (! is_array($daemon) || ! isset($daemon['port'], $daemon['pid'])) {
+            return null;
+        }
+
+        if (! static::processIsRunning((int) $daemon['pid'])) {
+            return null;
+        }
+
+        return ['port' => (int) $daemon['port'], 'pid' => (int) $daemon['pid']];
+    }
+
+    public static function processIsRunning(int $pid): bool
+    {
+        // Without the posix extension we can't check, so we assume it's running...
+        if (! function_exists('posix_kill')) {
+            return true;
+        }
+
+        if (@posix_kill($pid, 0)) {
+            return true;
+        }
+
+        // EPERM means the process exists but belongs to another user...
+        return posix_get_last_error() === 1;
+    }
+
     public static function withInotifyWatcher(): void
     {
         config()->set('hotwire-hotreload.watcher', 'inotify');

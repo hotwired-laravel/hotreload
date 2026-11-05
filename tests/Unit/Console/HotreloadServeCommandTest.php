@@ -1,0 +1,104 @@
+<?php
+
+namespace Tests\Unit\Console;
+
+use HotwiredLaravel\Hotreload\Hotreload;
+use Illuminate\Support\Sleep;
+use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\Process\Process;
+use Tests\UnitTestCase;
+
+use function Orchestra\Testbench\package_path;
+
+class HotreloadServeCommandTest extends UnitTestCase
+{
+    private ?Process $daemon = null;
+
+    protected function tearDown(): void
+    {
+        $this->daemon?->stop();
+
+        parent::tearDown();
+    }
+
+    #[Test]
+    public function refuses_to_start_when_disabled(): void
+    {
+        config()->set('hotreload.enabled', false);
+
+        $this->artisan('hotreload:serve')->assertFailed();
+    }
+
+    #[Test]
+    public function streams_file_changes_to_connected_clients(): void
+    {
+        @unlink(Hotreload::hotFile());
+
+        $this->daemon = new Process(
+            [PHP_BINARY, package_path('vendor', 'bin', 'testbench'), 'hotreload:serve', '--port=0'],
+            package_path(),
+            ['HOTRELOAD_ENABLED' => 'true'],
+        );
+
+        $this->daemon->start();
+
+        $daemon = $this->waitFor(fn () => Hotreload::runningDaemon(), 'Daemon did not start: ' . $this->daemon->getErrorOutput() . $this->daemon->getOutput());
+
+        $this->assertSame($this->daemon->getPid(), $daemon['pid']);
+
+        $client = stream_socket_client("tcp://127.0.0.1:{$daemon['port']}", timeout: 2);
+        stream_set_blocking($client, false);
+        fwrite($client, "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: text/event-stream\r\n\r\n");
+
+        $received = '';
+
+        $this->waitFor(function () use ($client, &$received) {
+            $received .= (string) fread($client, 8192);
+
+            return str_contains($received, 'event: tick');
+        }, 'Did not receive the initial events.');
+
+        $this->assertStringContainsString('Content-Type: text/event-stream', $received);
+        $this->assertStringContainsString('Access-Control-Allow-Origin: *', $received);
+        $this->assertStringContainsString('event: booted', $received);
+
+        $view = collect(Hotreload::htmlPaths())
+            ->flatMap(fn ($path) => glob(rtrim($path, '/') . '/*.blade.php'))
+            ->first();
+
+        $this->assertNotNull($view, 'No view found to touch.');
+
+        Sleep::for(1)->second();
+        touch($view);
+
+        $this->waitFor(function () use ($client, &$received) {
+            $received .= (string) fread($client, 8192);
+
+            return str_contains($received, 'event: reload_html');
+        }, 'Did not receive the reload_html event.');
+
+        $this->assertStringContainsString(basename($view), $received);
+
+        fclose($client);
+
+        $this->daemon->signal(SIGTERM);
+        $this->daemon->wait();
+
+        $this->assertFileDoesNotExist(Hotreload::hotFile());
+    }
+
+    private function waitFor(callable $callback, string $message): mixed
+    {
+        $deadline = microtime(true) + 10;
+
+        while (microtime(true) < $deadline) {
+            if ($result = $callback()) {
+                return $result;
+            }
+
+            usleep(50_000);
+        }
+
+        $this->fail($message);
+    }
+}

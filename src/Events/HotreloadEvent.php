@@ -8,4 +8,3 @@ interface HotreloadEvent
 
     public function eventData(): array;
 }
-
