@@ -3,22 +3,75 @@
 namespace Tests\Unit;
 
 use HotwiredLaravel\Hotreload\DaemonLauncher;
+use HotwiredLaravel\Hotreload\Hotreload;
 use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\Test;
+use ReflectionProperty;
 use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Output\NullOutput;
 use Tests\UnitTestCase;
 
-class ServeCommandHookTest extends UnitTestCase
+class DaemonAutoStartTest extends UnitTestCase
 {
     private FakeDaemonLauncher $launcher;
+
+    private array $devCommands = [];
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->app->instance(DaemonLauncher::class, $this->launcher = new FakeDaemonLauncher);
+
+        $this->devCommands = (new ReflectionProperty(DevCommands::class, 'commands'))->getValue();
+    }
+
+    protected function tearDown(): void
+    {
+        (new ReflectionProperty(DevCommands::class, 'commands'))->setValue(null, $this->devCommands);
+
+        parent::tearDown();
+    }
+
+    #[Test]
+    public function registers_daemon_as_dev_command(): void
+    {
+        $this->assertSame(
+            'php artisan hotreload:serve --port=0',
+            $this->devCommand('hotreload')['command'] ?? null,
+        );
+    }
+
+    #[Test]
+    public function dev_command_uses_configured_port(): void
+    {
+        config()->set('hotreload.port', 7777);
+
+        $this->rebootDevCommands();
+
+        $this->assertSame('php artisan hotreload:serve --port=7777', $this->devCommand('hotreload')['command']);
+    }
+
+    #[Test]
+    public function doesnt_register_dev_command_with_random_port_inside_containers(): void
+    {
+        $this->launcher->inContainer = true;
+
+        $this->rebootDevCommands();
+
+        $this->assertNull($this->devCommand('hotreload'));
+    }
+
+    #[Test]
+    public function doesnt_register_dev_command_when_disabled(): void
+    {
+        config()->set('hotreload.enabled', false);
+
+        $this->rebootDevCommands();
+
+        $this->assertNull($this->devCommand('hotreload'));
     }
 
     #[Test]
@@ -86,6 +139,21 @@ class ServeCommandHookTest extends UnitTestCase
         $this->dispatchCommandStarting('serve', '--host=0.0.0.0');
 
         $this->assertSame(['host' => '0.0.0.0', 'port' => 7777, 'parentPid' => getmypid()], $this->launcher->launches[0]);
+    }
+
+    /**
+     * Clears the registered dev commands and registers ours again.
+     */
+    private function rebootDevCommands(): void
+    {
+        (new ReflectionProperty(DevCommands::class, 'commands'))->setValue(null, []);
+
+        Hotreload::registerDevCommands();
+    }
+
+    private function devCommand(string $name): ?array
+    {
+        return collect(DevCommands::commands())->firstWhere('name', $name);
     }
 
     private function dispatchCommandStarting(string $command, string ...$options): void

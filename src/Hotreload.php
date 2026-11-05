@@ -10,6 +10,7 @@ use HotwiredLaravel\Hotreload\Events\ReloadStimulus;
 use HotwiredLaravel\Hotreload\Exceptions\HotreloadException;
 use HotwiredLaravel\Hotreload\Watchers\InotifyFileWatcher;
 use HotwiredLaravel\Hotreload\Watchers\SimpleFileWatcher;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\Facades\Event;
 
 class Hotreload
@@ -21,6 +22,26 @@ class Hotreload
     public static function enabled(): bool
     {
         return (bool) config('hotreload.enabled');
+    }
+
+    /**
+     * Registers the hotreload daemon as a `php artisan dev` process (Laravel 13.16+).
+     */
+    public static function registerDevCommands(): void
+    {
+        if (class_exists(DevCommands::class) && static::enabled() && static::shouldStartDaemon()) {
+            DevCommands::artisan('hotreload:serve --port=' . (int) config('hotreload.port', 0), 'hotreload');
+        }
+    }
+
+    /**
+     * Random ports inside containers (like Sail) can't be published, so we fall back to
+     * the in-process SSE route there unless a port was explicitly configured.
+     */
+    public static function shouldStartDaemon(): bool
+    {
+        return (int) config('hotreload.port', 0) !== 0
+            || ! app(DaemonLauncher::class)->runningInContainer();
     }
 
     public static function hotFile(): string

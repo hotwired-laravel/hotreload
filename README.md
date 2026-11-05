@@ -82,7 +82,10 @@ HOTRELOAD_ENABLED=true
 
 #### The Hotreload Daemon
 
-When you run `php artisan serve` (or `php artisan dev` / `composer dev`, which run `serve` under the hood), the package automatically starts a small hotreload daemon next to it. The daemon watches your files and streams changes to the browser on its own port, so it never holds up the PHP server's workers. It stops when the server stops. There's nothing to configure.
+The package automatically starts a small hotreload daemon while you develop. The daemon watches your files and streams changes to the browser on its own port, so it never holds up the PHP server's workers. There's nothing to configure:
+
+- **`php artisan dev` / `composer dev`** (Laravel 13.16+): the daemon runs as its own `hotreload` process, next to `server`, `queue`, `logs`, and `vite`. You can see it with `php artisan dev:list`, or skip it with `DevCommands::except('hotreload')`.
+- **`php artisan serve`**: the daemon is started alongside the server and stops when the server stops.
 
 By default, the daemon binds to a random port. You may pin it to a specific port:
 

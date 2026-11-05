@@ -35,12 +35,19 @@ class HotreloadServeCommand extends Command
 
     private bool $cleanedUp = false;
 
+    /** @var resource|null */
+    private $lock = null;
+
     public function handle(): int
     {
         if (! Hotreload::enabled() && ! $this->option('force')) {
             $this->components->warn('Hotreload is disabled. Set HOTRELOAD_ENABLED=true or use --force to start the daemon anyway.');
 
             return self::FAILURE;
+        }
+
+        if (! $this->acquireLock()) {
+            return self::SUCCESS;
         }
 
         $this->clients = new SplObjectStorage;
@@ -76,6 +83,36 @@ class HotreloadServeCommand extends Command
         $this->cleanUp();
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Only one daemon may run per application (`php artisan dev` starts one as its own process,
+     * and its `serve` process tries to start another). The ones that don't get the lock wait,
+     * so they take over if the running daemon goes away.
+     */
+    private function acquireLock(): bool
+    {
+        @mkdir(dirname(Hotreload::hotFile()), recursive: true);
+
+        $this->lock = fopen(Hotreload::hotFile() . '.lock', 'c');
+
+        $waiting = false;
+        $parentPid = (int) $this->option('parent-pid');
+
+        while (! flock($this->lock, LOCK_EX | LOCK_NB)) {
+            if (! $waiting) {
+                $this->components->info('Another hotreload daemon is already running for this application. Waiting for it to stop...');
+                $waiting = true;
+            }
+
+            if ($parentPid > 0 && ! Hotreload::processIsRunning($parentPid)) {
+                return false;
+            }
+
+            sleep(1);
+        }
+
+        return true;
     }
 
     private function bindHost(): string
@@ -164,8 +201,6 @@ class HotreloadServeCommand extends Command
 
     private function writeHotFile(int $port): void
     {
-        @mkdir(dirname(Hotreload::hotFile()), recursive: true);
-
         file_put_contents(Hotreload::hotFile(), json_encode([
             'port' => $port,
             'pid' => getmypid(),

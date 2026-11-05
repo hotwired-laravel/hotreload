@@ -22,6 +22,8 @@ class HotreloadServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(DaemonLauncher::class);
+
+        Hotreload::registerDevCommands();
     }
 
     public function boot()
@@ -34,40 +36,30 @@ class HotreloadServiceProvider extends ServiceProvider
             return;
         }
 
-        $this->configureDaemonForServeCommand();
+        $this->configureServeCommand();
         $this->configureMiddleware();
         $this->configureJsFileRoutes();
         $this->configureServerSentEventsRoute();
     }
 
     /**
-     * Starts the hotreload daemon alongside `php artisan serve`, which also
-     * covers `php artisan dev` and `composer dev` (they run `serve`).
+     * Starts the hotreload daemon alongside `php artisan serve`. When `serve` runs under
+     * `php artisan dev`, the daemon's lock makes sure only one of them keeps running.
      */
-    private function configureDaemonForServeCommand(): void
+    private function configureServeCommand(): void
     {
         if (! $this->app->runningInConsole()) {
             return;
         }
 
         Event::listen(function (CommandStarting $event) {
-            if ($event->command !== 'serve') {
+            if ($event->command !== 'serve' || ! Hotreload::shouldStartDaemon()) {
                 return;
             }
 
-            $port = (int) config('hotreload.port', 0);
-
-            $launcher = $this->app->make(DaemonLauncher::class);
-
-            // Random ports inside containers (like Sail) can't be published, so we fall back
-            // to the in-process SSE route unless a port was explicitly configured...
-            if ($port === 0 && $launcher->runningInContainer()) {
-                return;
-            }
-
-            $launcher->launch(
+            $this->app->make(DaemonLauncher::class)->launch(
                 host: $this->daemonHostFor((string) $event->input->getParameterOption('--host', env('SERVER_HOST', '127.0.0.1'))),
-                port: $port,
+                port: (int) config('hotreload.port', 0),
                 parentPid: getmypid(),
             );
         });

@@ -14,9 +14,12 @@ class HotreloadServeCommandTest extends UnitTestCase
 {
     private ?Process $daemon = null;
 
+    private ?Process $secondDaemon = null;
+
     protected function tearDown(): void
     {
         $this->daemon?->stop();
+        $this->secondDaemon?->stop();
 
         parent::tearDown();
     }
@@ -34,13 +37,7 @@ class HotreloadServeCommandTest extends UnitTestCase
     {
         @unlink(Hotreload::hotFile());
 
-        $this->daemon = new Process(
-            [PHP_BINARY, package_path('vendor', 'bin', 'testbench'), 'hotreload:serve', '--port=0'],
-            package_path(),
-            ['HOTRELOAD_ENABLED' => 'true'],
-        );
-
-        $this->daemon->start();
+        $this->daemon = $this->startDaemon();
 
         $daemon = $this->waitFor(fn () => Hotreload::runningDaemon(), 'Daemon did not start: ' . $this->daemon->getErrorOutput() . $this->daemon->getOutput());
 
@@ -85,6 +82,48 @@ class HotreloadServeCommandTest extends UnitTestCase
         $this->daemon->wait();
 
         $this->assertFileDoesNotExist(Hotreload::hotFile());
+    }
+
+    #[Test]
+    public function only_one_daemon_runs_per_application(): void
+    {
+        @unlink(Hotreload::hotFile());
+
+        $this->daemon = $this->startDaemon();
+
+        $first = $this->waitFor(fn () => Hotreload::runningDaemon(), 'First daemon did not start.');
+
+        $this->assertSame($this->daemon->getPid(), $first['pid']);
+
+        $this->secondDaemon = $this->startDaemon();
+
+        $this->waitFor(
+            fn () => str_contains($this->secondDaemon->getOutput(), 'Another hotreload daemon is already running'),
+            'Second daemon did not wait for the lock: ' . $this->secondDaemon->getErrorOutput() . $this->secondDaemon->getOutput(),
+        );
+
+        $this->assertSame($first, Hotreload::runningDaemon());
+
+        // When the first daemon stops, the waiting one takes over...
+        $this->daemon->signal(SIGTERM);
+        $this->daemon->wait();
+
+        $second = $this->waitFor(fn () => Hotreload::runningDaemon(), 'Second daemon did not take over.');
+
+        $this->assertSame($this->secondDaemon->getPid(), $second['pid']);
+    }
+
+    private function startDaemon(): Process
+    {
+        $daemon = new Process(
+            [PHP_BINARY, package_path('vendor', 'bin', 'testbench'), 'hotreload:serve', '--port=0'],
+            package_path(),
+            ['HOTRELOAD_ENABLED' => 'true'],
+        );
+
+        $daemon->start();
+
+        return $daemon;
     }
 
     private function waitFor(callable $callback, string $message): mixed
