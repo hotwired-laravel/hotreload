@@ -2,6 +2,7 @@
 
 namespace HotwiredLaravel\Hotreload\Console;
 
+use HotwiredLaravel\Hotreload\DaemonLauncher;
 use HotwiredLaravel\Hotreload\Events\HotreloadEvent;
 use HotwiredLaravel\Hotreload\FileWatchers;
 use HotwiredLaravel\Hotreload\Hotreload;
@@ -53,13 +54,9 @@ class HotreloadServeCommand extends Command
         $this->clients = new SplObjectStorage;
 
         $host = $this->bindHost();
-        $port = $this->option('port') ?? config('hotreload.port', 0);
+        $port = (int) ($this->option('port') ?? Hotreload::port());
 
-        try {
-            $socket = new SocketServer("{$host}:{$port}");
-        } catch (Throwable $e) {
-            $this->components->error("Hotreload daemon failed to bind to [{$host}:{$port}]: {$e->getMessage()}");
-
+        if (! ($socket = $this->bind($host, $port))) {
             return self::FAILURE;
         }
 
@@ -113,6 +110,25 @@ class HotreloadServeCommand extends Command
         }
 
         return true;
+    }
+
+    private function bind(string $host, int $port): ?SocketServer
+    {
+        try {
+            return new SocketServer("{$host}:{$port}");
+        } catch (Throwable $e) {
+            // When the port is taken (like by another app's daemon), use a random one instead. Not
+            // inside containers, though, since random ports can't be reached from the browser...
+            if ($port !== 0 && ! app(DaemonLauncher::class)->runningInContainer()) {
+                $this->components->warn("Hotreload daemon couldn't bind to [{$host}:{$port}] ({$e->getMessage()}). Using a random port instead.");
+
+                return $this->bind($host, 0);
+            }
+
+            $this->components->error("Hotreload daemon failed to bind to [{$host}:{$port}]: {$e->getMessage()}");
+
+            return null;
+        }
     }
 
     private function bindHost(): string

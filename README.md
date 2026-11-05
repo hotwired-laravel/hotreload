@@ -52,7 +52,7 @@ if (app()->environment('local') && class_exists(Hotreload::class)) {
 }
 ```
 
-### Hot it works
+### How it works
 
 The package injects a script into your application via a middleware. That script will start an `EventSource` subscribed to a [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) (aka. SSE) stream served by the [hotreload daemon](#the-hotreload-daemon), which watches files for changes in the configured directories. There are a couple of reloaders which are activated depending on which directory you configured (or the default ones):
 
@@ -87,11 +87,13 @@ The package automatically starts a small hotreload daemon while you develop. The
 - **`php artisan dev` / `composer dev`** (Laravel 13.16+): the daemon runs as its own `hotreload` process, next to `server`, `queue`, `logs`, and `vite`. You can see it with `php artisan dev:list`, or skip it with `DevCommands::except('hotreload')`.
 - **`php artisan serve`**: the daemon is started alongside the server and stops when the server stops.
 
-By default, the daemon binds to a random port. You may pin it to a specific port:
+By default, the daemon listens on port `7357`. You may change it with the `HOTRELOAD_PORT` env var (use `0` for a random port):
 
 ```env
-HOTRELOAD_PORT=7071
+HOTRELOAD_PORT=7358
 ```
+
+If the port is already taken (for instance, by another app's daemon), the daemon falls back to a random port, so you can run multiple apps side by side.
 
 You may also start the daemon manually with `php artisan hotreload:serve`.
 
@@ -99,26 +101,24 @@ When the daemon isn't running (for instance, when your app is served by Herd, Va
 
 #### Laravel Sail and Docker
 
-Random ports inside containers can't be reached from the browser, so inside containers the daemon only starts when you configure a port and publish it in your `docker-compose.yml`:
-
-```env
-HOTRELOAD_PORT=7071
-```
+The daemon also starts inside containers. To make it reachable from the browser, publish its port in your `docker-compose.yml`:
 
 ```yaml
 services:
     laravel.test:
         ports:
-            - '${HOTRELOAD_PORT:-7071}:7071'
+            - '${HOTRELOAD_PORT:-7357}:${HOTRELOAD_PORT:-7357}'
 ```
+
+Inside containers, the daemon doesn't fall back to a random port when its port is taken, since random ports can't be reached from the browser.
 
 If the published port differs from the one inside the container (or the daemon sits behind a proxy), set the URL the browser should use:
 
 ```env
-HOTRELOAD_URL=http://localhost:7071
+HOTRELOAD_URL=http://localhost:7357
 ```
 
-Without a published port, the browser falls back to the in-process SSE route. In that case, set the number of PHP server workers in your `.env` file so the SSE connection doesn't block your app:
+If you don't publish the port, the browser falls back to the in-process SSE route. In that case, set the number of PHP server workers in your `.env` file so the SSE connection doesn't block your app:
 
 ```env
 PHP_CLI_SERVER_WORKERS=4

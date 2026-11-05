@@ -39,7 +39,7 @@ class DaemonAutoStartTest extends UnitTestCase
     public function registers_daemon_as_dev_command(): void
     {
         $this->assertSame(
-            'php artisan hotreload:serve --port=0',
+            'php artisan hotreload:serve --host=127.0.0.1 --port=7357',
             $this->devCommand('hotreload')['command'] ?? null,
         );
     }
@@ -51,13 +51,25 @@ class DaemonAutoStartTest extends UnitTestCase
 
         $this->rebootDevCommands();
 
-        $this->assertSame('php artisan hotreload:serve --port=7777', $this->devCommand('hotreload')['command']);
+        $this->assertSame('php artisan hotreload:serve --host=127.0.0.1 --port=7777', $this->devCommand('hotreload')['command']);
+    }
+
+    #[Test]
+    public function dev_command_listens_on_all_interfaces_inside_containers(): void
+    {
+        $this->launcher->inContainer = true;
+
+        $this->rebootDevCommands();
+
+        $this->assertSame('php artisan hotreload:serve --host=0.0.0.0 --port=7357', $this->devCommand('hotreload')['command']);
     }
 
     #[Test]
     public function doesnt_register_dev_command_with_random_port_inside_containers(): void
     {
         $this->launcher->inContainer = true;
+
+        config()->set('hotreload.port', 0);
 
         $this->rebootDevCommands();
 
@@ -80,7 +92,7 @@ class DaemonAutoStartTest extends UnitTestCase
         $this->dispatchCommandStarting('serve');
 
         $this->assertEquals([
-            ['host' => '127.0.0.1', 'port' => 0, 'parentPid' => getmypid()],
+            ['host' => '127.0.0.1', 'port' => 7357, 'parentPid' => getmypid()],
         ], $this->launcher->launches);
     }
 
@@ -124,21 +136,21 @@ class DaemonAutoStartTest extends UnitTestCase
     {
         $this->launcher->inContainer = true;
 
+        config()->set('hotreload.port', 0);
+
         $this->dispatchCommandStarting('serve', '--host=0.0.0.0');
 
         $this->assertEmpty($this->launcher->launches);
     }
 
     #[Test]
-    public function launches_inside_containers_when_port_is_configured(): void
+    public function launches_inside_containers_with_the_default_port(): void
     {
         $this->launcher->inContainer = true;
 
-        config()->set('hotreload.port', 7777);
-
         $this->dispatchCommandStarting('serve', '--host=0.0.0.0');
 
-        $this->assertSame(['host' => '0.0.0.0', 'port' => 7777, 'parentPid' => getmypid()], $this->launcher->launches[0]);
+        $this->assertSame(['host' => '0.0.0.0', 'port' => 7357, 'parentPid' => getmypid()], $this->launcher->launches[0]);
     }
 
     /**

@@ -113,10 +113,30 @@ class HotreloadServeCommandTest extends UnitTestCase
         $this->assertSame($this->secondDaemon->getPid(), $second['pid']);
     }
 
-    private function startDaemon(): Process
+    #[Test]
+    public function falls_back_to_a_random_port_when_the_port_is_taken(): void
+    {
+        @unlink(Hotreload::hotFile());
+
+        $taken = stream_socket_server('tcp://127.0.0.1:0');
+        $takenPort = (int) parse_url('tcp://' . stream_socket_get_name($taken, false), PHP_URL_PORT);
+
+        try {
+            $this->daemon = $this->startDaemon($takenPort);
+
+            $daemon = $this->waitFor(fn () => Hotreload::runningDaemon(), 'Daemon did not start: ' . $this->daemon->getErrorOutput() . $this->daemon->getOutput());
+
+            $this->assertNotSame($takenPort, $daemon['port']);
+            $this->assertStringContainsString('Using a random port instead', $this->daemon->getOutput());
+        } finally {
+            fclose($taken);
+        }
+    }
+
+    private function startDaemon(int $port = 0): Process
     {
         $daemon = new Process(
-            [PHP_BINARY, package_path('vendor', 'bin', 'testbench'), 'hotreload:serve', '--port=0'],
+            [PHP_BINARY, package_path('vendor', 'bin', 'testbench'), 'hotreload:serve', "--port={$port}"],
             package_path(),
             ['HOTRELOAD_ENABLED' => 'true'],
         );

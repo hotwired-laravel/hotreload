@@ -59,7 +59,7 @@ class HotreloadServiceProvider extends ServiceProvider
 
             $this->app->make(DaemonLauncher::class)->launch(
                 host: $this->daemonHostFor((string) $event->input->getParameterOption('--host', env('SERVER_HOST', '127.0.0.1'))),
-                port: (int) config('hotreload.port', 0),
+                port: Hotreload::port(),
                 parentPid: getmypid(),
             );
         });

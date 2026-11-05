@@ -18,6 +18,7 @@ class Hotreload
     protected static $htmlPaths = [];
     protected static $stimulusPaths = [];
     protected static $cssPaths = [];
+    public const DEFAULT_PORT = 7357;
 
     public static function enabled(): bool
     {
@@ -30,18 +31,26 @@ class Hotreload
     public static function registerDevCommands(): void
     {
         if (class_exists(DevCommands::class) && static::enabled() && static::shouldStartDaemon()) {
-            DevCommands::artisan('hotreload:serve --port=' . (int) config('hotreload.port', 0), 'hotreload');
+            // Inside containers, the daemon must listen on all interfaces so published ports can reach it...
+            $host = app(DaemonLauncher::class)->runningInContainer() ? '0.0.0.0' : '127.0.0.1';
+
+            DevCommands::artisan("hotreload:serve --host={$host} --port=" . static::port(), 'hotreload');
         }
     }
 
     /**
-     * Random ports inside containers (like Sail) can't be published, so we fall back to
-     * the in-process SSE route there unless a port was explicitly configured.
+     * Random ports inside containers (like Sail) can't be published, so when the port is
+     * set to 0 we fall back to the in-process SSE route there.
      */
     public static function shouldStartDaemon(): bool
     {
-        return (int) config('hotreload.port', 0) !== 0
+        return static::port() !== 0
             || ! app(DaemonLauncher::class)->runningInContainer();
+    }
+
+    public static function port(): int
+    {
+        return (int) config('hotreload.port', static::DEFAULT_PORT);
     }
 
     public static function hotFile(): string
