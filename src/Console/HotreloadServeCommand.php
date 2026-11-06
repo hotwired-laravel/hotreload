@@ -39,6 +39,8 @@ class HotreloadServeCommand extends Command
     /** @var resource|null */
     private $lock = null;
 
+    private int $startedAt = 0;
+
     public function handle(): int
     {
         if (! Hotreload::enabled() && ! $this->option('force')) {
@@ -64,7 +66,9 @@ class HotreloadServeCommand extends Command
 
         $this->bootWatchers();
 
-        (new HttpServer(fn (ServerRequestInterface $request) => $this->connect()))->listen($socket);
+        $this->startedAt = time();
+
+        (new HttpServer(fn (ServerRequestInterface $request) => $this->handleRequest($request)))->listen($socket);
 
         $this->writeHotFile($port);
 
@@ -150,6 +154,29 @@ class HotreloadServeCommand extends Command
 
         $this->watchers = Hotreload::watchers();
         $this->watchers->boot();
+    }
+
+    private function handleRequest(ServerRequestInterface $request): Response
+    {
+        return match ($request->getUri()->getPath()) {
+            '/', '' => $this->connect(),
+            '/up' => $this->health(),
+            default => new Response(404, ['Content-Type' => 'text/plain'], 'Not Found'),
+        };
+    }
+
+    /**
+     * A health check endpoint, similar to Laravel's `/up` route (useful for Docker healthchecks).
+     */
+    private function health(): Response
+    {
+        return Response::json([
+            'status' => 'up',
+            'pid' => getmypid(),
+            'watcher' => Hotreload::getConfiguredWatcher(),
+            'clients' => count($this->clients),
+            'uptime' => time() - $this->startedAt,
+        ])->withHeader('Access-Control-Allow-Origin', '*')->withHeader('Cache-Control', 'no-cache');
     }
 
     private function connect(): Response

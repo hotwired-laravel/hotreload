@@ -114,6 +114,36 @@ class HotreloadServeCommandTest extends UnitTestCase
     }
 
     #[Test]
+    public function exposes_a_health_check_endpoint(): void
+    {
+        @unlink(Hotreload::hotFile());
+
+        $this->daemon = $this->startDaemon();
+
+        $daemon = $this->waitFor(fn () => Hotreload::runningDaemon(), 'Daemon did not start: ' . $this->daemon->getErrorOutput() . $this->daemon->getOutput());
+
+        $health = $this->fetch("http://127.0.0.1:{$daemon['port']}/up");
+
+        $this->assertSame(200, $health['status']);
+        $this->assertStringContainsString('application/json', $health['headers']);
+        $this->assertSame('up', $health['json']['status']);
+        $this->assertSame($daemon['pid'], $health['json']['pid']);
+        $this->assertSame(0, $health['json']['clients']);
+        $this->assertArrayHasKey('watcher', $health['json']);
+        $this->assertArrayHasKey('uptime', $health['json']);
+
+        // Connected SSE clients are reported...
+        $client = stream_socket_client("tcp://127.0.0.1:{$daemon['port']}", timeout: 2);
+        fwrite($client, "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: text/event-stream\r\n\r\n");
+
+        $this->waitFor(fn () => $this->fetch("http://127.0.0.1:{$daemon['port']}/up")['json']['clients'] === 1, 'SSE client was not counted.');
+
+        fclose($client);
+
+        $this->assertSame(404, $this->fetch("http://127.0.0.1:{$daemon['port']}/nope")['status']);
+    }
+
+    #[Test]
     public function falls_back_to_a_random_port_when_the_port_is_taken(): void
     {
         @unlink(Hotreload::hotFile());
@@ -131,6 +161,26 @@ class HotreloadServeCommandTest extends UnitTestCase
         } finally {
             fclose($taken);
         }
+    }
+
+    /**
+     * @return array{status: int, headers: string, json: mixed}
+     */
+    private function fetch(string $url): array
+    {
+        $body = @file_get_contents($url, context: stream_context_create([
+            'http' => ['ignore_errors' => true, 'timeout' => 2],
+        ]));
+
+        $headers = implode("\n", $http_response_header ?? []);
+
+        preg_match('#^HTTP/\S+ (\d{3})#', $headers, $matches);
+
+        return [
+            'status' => (int) ($matches[1] ?? 0),
+            'headers' => $headers,
+            'json' => json_decode((string) $body, true),
+        ];
     }
 
     private function startDaemon(int $port = 0): Process

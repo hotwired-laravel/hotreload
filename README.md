@@ -97,6 +97,22 @@ If the port is already taken (for instance, by another app's daemon), the daemon
 
 You may also start the daemon manually with `php artisan hotreload:serve`.
 
+The daemon exposes a health check endpoint at `/up` (similar to Laravel's), which returns a `200` response with some details about the daemon:
+
+```bash
+curl http://localhost:7357/up
+```
+
+```json
+{
+    "status": "up",
+    "pid": 1234,
+    "watcher": "inotify",
+    "clients": 1,
+    "uptime": 42
+}
+```
+
 When the daemon isn't running (for instance, when your app is served by Herd, Valet, or nginx + PHP-FPM), the browser falls back to an SSE route served by your app. That route keeps one PHP worker busy per open tab, so make sure your server has more than one worker.
 
 #### Laravel Sail and Docker
