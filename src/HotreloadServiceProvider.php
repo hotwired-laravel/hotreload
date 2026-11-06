@@ -3,6 +3,7 @@
 namespace HotwiredLaravel\Hotreload;
 
 use Closure;
+use HotwiredLaravel\Hotreload\Console\HotreloadInstallCommand;
 use HotwiredLaravel\Hotreload\Console\HotreloadServeCommand;
 use HotwiredLaravel\Hotreload\Http\Controllers\HotreloadServerSentEventsController;
 use HotwiredLaravel\Hotreload\Http\Middleware\HotreloadMiddleware;
@@ -29,7 +30,7 @@ class HotreloadServiceProvider extends ServiceProvider
     public function boot()
     {
         if ($this->app->runningInConsole()) {
-            $this->commands([HotreloadServeCommand::class]);
+            $this->commands([HotreloadInstallCommand::class, HotreloadServeCommand::class]);
         }
 
         if (! Hotreload::enabled()) {

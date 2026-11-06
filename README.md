@@ -26,6 +26,14 @@ This package was _heavily_ inspired by the [Hotwire Spark](https://github.com/ho
 composer require hotwired-laravel/hotreload --dev
 ```
 
+Then, run the install command:
+
+```bash
+php artisan hotreload:install
+```
+
+It adds the daemon's files to your `.gitignore` and, if you have a Compose file (like when using Laravel Sail), publishes the [daemon's port](#laravel-sail-and-docker) on your application's service. It's safe to run more than once.
+
 That's it!
 
 By default, a simple file watcher will be used. There's another file watcher that is more efficient but requires the [inotify](https://www.php.net/inotify-init) extension, which you may install via PECL:
@@ -117,7 +125,9 @@ When the daemon isn't running (for instance, when your app is served by Herd, Va
 
 #### Laravel Sail and Docker
 
-The daemon also starts inside containers. To make it reachable from the browser, publish its port in your `docker-compose.yml`:
+The daemon also starts inside containers. To make it reachable from the browser, its port must be published. The `hotreload:install` command does that for you on the service named by the `APP_SERVICE` env var (`laravel.test` by default). Recreate the container afterwards (like with `sail up -d`) for the port to take effect.
+
+If you prefer, you may publish the port manually in your Compose file:
 
 ```yaml
 services:
