@@ -10,6 +10,7 @@ use HotwiredLaravel\Hotreload\Events\ReloadStimulus;
 use HotwiredLaravel\Hotreload\Exceptions\HotreloadException;
 use HotwiredLaravel\Hotreload\Watchers\InotifyFileWatcher;
 use HotwiredLaravel\Hotreload\Watchers\SimpleFileWatcher;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\Facades\Event;
 
 class Hotreload
@@ -17,6 +18,84 @@ class Hotreload
     protected static $htmlPaths = [];
     protected static $stimulusPaths = [];
     protected static $cssPaths = [];
+    public const DEFAULT_PORT = 7357;
+
+    public static function enabled(): bool
+    {
+        return (bool) config('hotreload.enabled');
+    }
+
+    /**
+     * Registers the hotreload daemon as a `php artisan dev` process (Laravel 13.16+).
+     */
+    public static function registerDevCommands(): void
+    {
+        if (class_exists(DevCommands::class) && static::enabled() && static::shouldStartDaemon()) {
+            // Inside containers, the daemon must listen on all interfaces so published ports can reach it...
+            $host = app(DaemonLauncher::class)->runningInContainer() ? '0.0.0.0' : '127.0.0.1';
+
+            DevCommands::artisan("hotreload:serve --host={$host} --port=" . static::port(), 'hotreload');
+        }
+    }
+
+    /**
+     * Random ports inside containers (like Sail) can't be published, so when the port is
+     * set to 0 we fall back to the in-process SSE route there.
+     */
+    public static function shouldStartDaemon(): bool
+    {
+        return static::port() !== 0
+            || ! app(DaemonLauncher::class)->runningInContainer();
+    }
+
+    public static function port(): int
+    {
+        return (int) config('hotreload.port', static::DEFAULT_PORT);
+    }
+
+    public static function hotFile(): string
+    {
+        return storage_path('framework/hotreload.json');
+    }
+
+    /**
+     * Returns the running daemon's info (port and pid), or null when no daemon is running.
+     *
+     * @return array{port: int, pid: int}|null
+     */
+    public static function runningDaemon(): ?array
+    {
+        if (! is_file($file = static::hotFile())) {
+            return null;
+        }
+
+        $daemon = json_decode((string) @file_get_contents($file), true);
+
+        if (! is_array($daemon) || ! isset($daemon['port'], $daemon['pid'])) {
+            return null;
+        }
+
+        if (! static::processIsRunning((int) $daemon['pid'])) {
+            return null;
+        }
+
+        return ['port' => (int) $daemon['port'], 'pid' => (int) $daemon['pid']];
+    }
+
+    public static function processIsRunning(int $pid): bool
+    {
+        // Without the posix extension we can't check, so we assume it's running...
+        if (! function_exists('posix_kill')) {
+            return true;
+        }
+
+        if (@posix_kill($pid, 0)) {
+            return true;
+        }
+
+        // EPERM means the process exists but belongs to another user...
+        return posix_get_last_error() === 1;
+    }
 
     public static function withInotifyWatcher(): void
     {

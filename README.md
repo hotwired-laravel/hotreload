@@ -26,6 +26,14 @@ This package was _heavily_ inspired by the [Hotwire Spark](https://github.com/ho
 composer require hotwired-laravel/hotreload --dev
 ```
 
+Then, run the install command:
+
+```bash
+php artisan hotreload:install
+```
+
+It adds the daemon's files to your `.gitignore` and, if you have a Compose file (like when using Laravel Sail), publishes the [daemon's port](#laravel-sail-and-docker) on your application's service. It's safe to run more than once.
+
 That's it!
 
 By default, a simple file watcher will be used. There's another file watcher that is more efficient but requires the [inotify](https://www.php.net/inotify-init) extension, which you may install via PECL:
@@ -52,9 +60,9 @@ if (app()->environment('local') && class_exists(Hotreload::class)) {
 }
 ```
 
-### Hot it works
+### How it works
 
-The package injects a script into your application via a middleware. That script will start an `EventSource` subscribed to a [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) (aka. SSE) that will start watching files for changes in the configured directory. There are a couple of reloaders which are activated depending on which directory you configured (or the default ones):
+The package injects a script into your application via a middleware. That script will start an `EventSource` subscribed to a [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) (aka. SSE) stream served by the [hotreload daemon](#the-hotreload-daemon), which watches files for changes in the configured directories. There are a couple of reloaders which are activated depending on which directory you configured (or the default ones):
 
 - HTML files
 - CSS
@@ -69,17 +77,77 @@ This package was built for Turbo Laravel, so it expects that you're using [Impor
 
 ### Configuration
 
-#### On PHP Processes
+#### Enabling and Disabling
 
-For this to work, we need at least 2 processes, since the SSE route will cause the process to hang indefinitely. If you're using `php artisan serve` (which [Laravel Sail](https://github.com/laravel/sail/blob/1.x/runtimes/8.4/Dockerfile#L14) uses by default). For that reason, make sure you set the number of PHP processes on your `.env` file:
+Hotreload is enabled by default only when `APP_ENV=local`. You may explicitly enable or disable it with the `HOTRELOAD_ENABLED` env var:
+
+```env
+HOTRELOAD_ENABLED=true
+```
+
+> [!NOTE]
+> Previous versions were enabled in every environment by default. If you use a custom environment name for local development (like `dev`), set `HOTRELOAD_ENABLED=true`.
+
+#### The Hotreload Daemon
+
+The package automatically starts a small hotreload daemon while you develop. The daemon watches your files and streams changes to the browser on its own port, so it never holds up the PHP server's workers. There's nothing to configure:
+
+- **`php artisan dev` / `composer dev`** (Laravel 13.16+): the daemon runs as its own `hotreload` process, next to `server`, `queue`, `logs`, and `vite`. You can see it with `php artisan dev:list`, or skip it with `DevCommands::except('hotreload')`.
+- **`php artisan serve`**: the daemon is started alongside the server and stops when the server stops.
+
+By default, the daemon listens on port `7357`. You may change it with the `HOTRELOAD_PORT` env var (use `0` for a random port):
+
+```env
+HOTRELOAD_PORT=7358
+```
+
+If the port is already taken (for instance, by another app's daemon), the daemon falls back to a random port, so you can run multiple apps side by side.
+
+You may also start the daemon manually with `php artisan hotreload:serve`.
+
+The daemon exposes a health check endpoint at `/up` (similar to Laravel's), which returns a `200` response with some details about the daemon:
+
+```bash
+curl http://localhost:7357/up
+```
+
+```json
+{
+    "status": "up",
+    "pid": 1234,
+    "watcher": "inotify",
+    "clients": 1,
+    "uptime": 42
+}
+```
+
+When the daemon isn't running (for instance, when your app is served by Herd, Valet, or nginx + PHP-FPM), the browser falls back to an SSE route served by your app. That route keeps one PHP worker busy per open tab, so make sure your server has more than one worker.
+
+#### Laravel Sail and Docker
+
+The daemon also starts inside containers. To make it reachable from the browser, its port must be published. The `hotreload:install` command does that for you on the service named by the `APP_SERVICE` env var (`laravel.test` by default). Recreate the container afterwards (like with `sail up -d`) for the port to take effect.
+
+If you prefer, you may publish the port manually in your Compose file:
+
+```yaml
+services:
+    laravel.test:
+        ports:
+            - '${HOTRELOAD_PORT:-7357}:${HOTRELOAD_PORT:-7357}'
+```
+
+Inside containers, the daemon doesn't fall back to a random port when its port is taken, since random ports can't be reached from the browser.
+
+If the published port differs from the one inside the container (or the daemon sits behind a proxy), set the URL the browser should use:
+
+```env
+HOTRELOAD_URL=http://localhost:7357
+```
+
+If you don't publish the port, the browser falls back to the in-process SSE route. In that case, set the number of PHP server workers in your `.env` file so the SSE connection doesn't block your app:
 
 ```env
 PHP_CLI_SERVER_WORKERS=4
-```
-[Laravel does that by default](https://github.com/laravel/laravel/blob/11.x/.env.example#L15) nowadays. You must also provide the `--no-reload` option to the serve command:
-
-```bash
-php artisan serve --no-reload
 ```
 
 #### HTML Replacing Method

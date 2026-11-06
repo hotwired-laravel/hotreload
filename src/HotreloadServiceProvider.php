@@ -3,9 +3,13 @@
 namespace HotwiredLaravel\Hotreload;
 
 use Closure;
+use HotwiredLaravel\Hotreload\Console\HotreloadInstallCommand;
+use HotwiredLaravel\Hotreload\Console\HotreloadServeCommand;
 use HotwiredLaravel\Hotreload\Http\Controllers\HotreloadServerSentEventsController;
 use HotwiredLaravel\Hotreload\Http\Middleware\HotreloadMiddleware;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -17,17 +21,54 @@ class HotreloadServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(
             __DIR__ . '/../config/hotreload.php', 'hotreload'
         );
+
+        $this->app->singleton(DaemonLauncher::class);
+
+        Hotreload::registerDevCommands();
     }
 
     public function boot()
     {
-        if (! config('hotreload.enabled')) {
+        if ($this->app->runningInConsole()) {
+            $this->commands([HotreloadInstallCommand::class, HotreloadServeCommand::class]);
+        }
+
+        if (! Hotreload::enabled()) {
             return;
         }
 
+        $this->configureServeCommand();
         $this->configureMiddleware();
         $this->configureJsFileRoutes();
         $this->configureServerSentEventsRoute();
+    }
+
+    /**
+     * Starts the hotreload daemon alongside `php artisan serve`. When `serve` runs under
+     * `php artisan dev`, the daemon's lock makes sure only one of them keeps running.
+     */
+    private function configureServeCommand(): void
+    {
+        if (! $this->app->runningInConsole()) {
+            return;
+        }
+
+        Event::listen(function (CommandStarting $event) {
+            if ($event->command !== 'serve' || ! Hotreload::shouldStartDaemon()) {
+                return;
+            }
+
+            $this->app->make(DaemonLauncher::class)->launch(
+                host: $this->daemonHostFor((string) $event->input->getParameterOption('--host', env('SERVER_HOST', '127.0.0.1'))),
+                port: Hotreload::port(),
+                parentPid: getmypid(),
+            );
+        });
+    }
+
+    private function daemonHostFor(string $serveHost): string
+    {
+        return in_array($serveHost, ['', 'localhost', '127.0.0.1'], true) ? '127.0.0.1' : '0.0.0.0';
     }
 
     private function configureMiddleware(): void
