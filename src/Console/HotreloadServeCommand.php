@@ -2,7 +2,6 @@
 
 namespace HotwiredLaravel\Hotreload\Console;
 
-use HotwiredLaravel\Hotreload\DaemonLauncher;
 use HotwiredLaravel\Hotreload\Events\HotreloadEvent;
 use HotwiredLaravel\Hotreload\FileWatchers;
 use HotwiredLaravel\Hotreload\Hotreload;
@@ -49,6 +48,10 @@ class HotreloadServeCommand extends Command
             return self::FAILURE;
         }
 
+        if (! $this->openLock()) {
+            return self::FAILURE;
+        }
+
         if (! $this->acquireLock()) {
             return self::SUCCESS;
         }
@@ -57,14 +60,15 @@ class HotreloadServeCommand extends Command
 
         $host = $this->bindHost();
         $port = (int) ($this->option('port') ?? Hotreload::port());
+        $explicitPort = $this->option('port') !== null || Hotreload::hasExplicitPort();
 
-        if (! ($socket = $this->bind($host, $port))) {
+        if (! ($socket = $this->bind($host, $port, $explicitPort))) {
             return self::FAILURE;
         }
 
         $port = (int) parse_url((string) $socket->getAddress(), PHP_URL_PORT);
 
-        $this->bootWatchers();
+        $this->listenForChanges();
 
         $this->startedAt = time();
 
@@ -86,6 +90,19 @@ class HotreloadServeCommand extends Command
         return self::SUCCESS;
     }
 
+    private function openLock(): bool
+    {
+        @mkdir(dirname(Hotreload::lockFile()), recursive: true);
+
+        if (! ($this->lock = @fopen(Hotreload::lockFile(), 'c'))) {
+            $this->components->error('Hotreload daemon could not open its lock file [' . Hotreload::lockFile() . ']. Make sure the directory is writable.');
+
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * Only one daemon may run per application (`php artisan dev` starts one as its own process,
      * and its `serve` process tries to start another). The ones that don't get the lock wait,
@@ -93,14 +110,15 @@ class HotreloadServeCommand extends Command
      */
     private function acquireLock(): bool
     {
-        @mkdir(dirname(Hotreload::hotFile()), recursive: true);
-
-        $this->lock = fopen(Hotreload::hotFile() . '.lock', 'c');
-
         $waiting = false;
         $parentPid = (int) $this->option('parent-pid');
 
         while (! flock($this->lock, LOCK_EX | LOCK_NB)) {
+            // We can't tell when our parent exits, so we'd wait forever and outlive it...
+            if ($parentPid > 0 && ! Hotreload::canCheckProcesses()) {
+                return false;
+            }
+
             if (! $waiting) {
                 $this->components->info('Another hotreload daemon is already running for this application. Waiting for it to stop...');
                 $waiting = true;
@@ -116,17 +134,18 @@ class HotreloadServeCommand extends Command
         return true;
     }
 
-    private function bind(string $host, int $port): ?SocketServer
+    private function bind(string $host, int $port, bool $explicitPort): ?SocketServer
     {
         try {
             return new SocketServer("{$host}:{$port}");
         } catch (Throwable $e) {
-            // When the port is taken (like by another app's daemon), use a random one instead. Not
-            // inside containers, though, since random ports can't be reached from the browser...
-            if ($port !== 0 && ! app(DaemonLauncher::class)->runningInContainer()) {
+            // When the default port is taken (like by another app's daemon), use a random one instead. Not when
+            // the port was configured (something like a proxy or a published port expects it), nor inside
+            // containers, since random ports can't be reached from the browser there...
+            if ($port !== 0 && ! $explicitPort && ! Hotreload::runningInContainer()) {
                 $this->components->warn("Hotreload daemon couldn't bind to [{$host}:{$port}] ({$e->getMessage()}). Using a random port instead.");
 
-                return $this->bind($host, 0);
+                return $this->bind($host, 0, $explicitPort);
             }
 
             $this->components->error("Hotreload daemon failed to bind to [{$host}:{$port}]: {$e->getMessage()}");
@@ -142,7 +161,7 @@ class HotreloadServeCommand extends Command
         return $host === 'localhost' ? '127.0.0.1' : $host;
     }
 
-    private function bootWatchers(): void
+    private function listenForChanges(): void
     {
         Event::listen(function (HotreloadEvent $event) {
             if ($this->output->isVerbose()) {
@@ -151,9 +170,26 @@ class HotreloadServeCommand extends Command
 
             $this->broadcast($event->eventName(), $event->eventData());
         });
+    }
+
+    /**
+     * The watchers only run while there are connected clients, so an idle daemon doesn't keep
+     * scanning the watched directories. They boot (taking a fresh snapshot) on the first client.
+     */
+    private function startWatching(): void
+    {
+        if ($this->watchers !== null) {
+            return;
+        }
 
         $this->watchers = Hotreload::watchers();
         $this->watchers->boot();
+    }
+
+    private function stopWatching(): void
+    {
+        $this->watchers?->stop();
+        $this->watchers = null;
     }
 
     private function handleRequest(ServerRequestInterface $request): Response
@@ -183,9 +219,17 @@ class HotreloadServeCommand extends Command
     {
         $stream = new ThroughStream;
 
+        $this->startWatching();
+
         $this->clients->attach($stream);
 
-        $stream->on('close', fn () => $this->clients->detach($stream));
+        $stream->on('close', function () use ($stream) {
+            $this->clients->detach($stream);
+
+            if (count($this->clients) === 0) {
+                $this->stopWatching();
+            }
+        });
 
         // Write the initial events on the next tick, once the response has been sent...
         Loop::futureTick(function () use ($stream) {
@@ -218,7 +262,7 @@ class HotreloadServeCommand extends Command
 
     private function registerTimers(): void
     {
-        Loop::addPeriodicTimer(0.05, fn () => $this->watchers->tick());
+        Loop::addPeriodicTimer(0.05, fn () => $this->watchers?->tick());
 
         Loop::addPeriodicTimer(5, fn () => $this->broadcast('tick', ['time' => time()]));
 
@@ -262,7 +306,7 @@ class HotreloadServeCommand extends Command
             $client->end();
         }
 
-        $this->watchers?->stop();
+        $this->stopWatching();
 
         // Only remove the hot file if it's ours (another daemon may have replaced it)...
         $daemon = json_decode((string) @file_get_contents(Hotreload::hotFile()), true);

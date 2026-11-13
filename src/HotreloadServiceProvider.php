@@ -9,6 +9,7 @@ use HotwiredLaravel\Hotreload\Http\Controllers\HotreloadServerSentEventsControll
 use HotwiredLaravel\Hotreload\Http\Middleware\HotreloadMiddleware;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Route;
@@ -24,7 +25,9 @@ class HotreloadServiceProvider extends ServiceProvider
 
         $this->app->singleton(DaemonLauncher::class);
 
-        Hotreload::registerDevCommands();
+        if ($this->app->runningInConsole()) {
+            Hotreload::registerDevCommands();
+        }
     }
 
     public function boot()
@@ -59,16 +62,10 @@ class HotreloadServiceProvider extends ServiceProvider
             }
 
             $this->app->make(DaemonLauncher::class)->launch(
-                host: $this->daemonHostFor((string) $event->input->getParameterOption('--host', env('SERVER_HOST', '127.0.0.1'))),
-                port: Hotreload::port(),
+                host: Hotreload::daemonHost((string) $event->input->getParameterOption('--host', env('SERVER_HOST', '127.0.0.1'))),
                 parentPid: getmypid(),
             );
         });
-    }
-
-    private function daemonHostFor(string $serveHost): string
-    {
-        return in_array($serveHost, ['', 'localhost', '127.0.0.1'], true) ? '127.0.0.1' : '0.0.0.0';
     }
 
     private function configureMiddleware(): void
@@ -110,5 +107,10 @@ class HotreloadServiceProvider extends ServiceProvider
     private function configureServerSentEventsRoute(): void
     {
         Route::get('/hotwired-laravel-hotreload/sse', HotreloadServerSentEventsController::class);
+
+        // The browser asks where the daemon is when it loses the connection (it may have restarted on another port)...
+        Route::get('/hotwired-laravel-hotreload/daemon', fn (Request $request) => Response::json([
+            'url' => Hotreload::daemonUrl($request->getHost()),
+        ])->header('Cache-Control', 'no-store'));
     }
 }

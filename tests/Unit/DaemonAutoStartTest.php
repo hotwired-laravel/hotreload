@@ -25,12 +25,16 @@ class DaemonAutoStartTest extends UnitTestCase
 
         $this->app->instance(DaemonLauncher::class, $this->launcher = new FakeDaemonLauncher);
 
+        Hotreload::assumeRunningInContainer(false);
+
         $this->devCommands = (new ReflectionProperty(DevCommands::class, 'commands'))->getValue();
     }
 
     protected function tearDown(): void
     {
         (new ReflectionProperty(DevCommands::class, 'commands'))->setValue(null, $this->devCommands);
+
+        Hotreload::assumeRunningInContainer(null);
 
         parent::tearDown();
     }
@@ -39,35 +43,25 @@ class DaemonAutoStartTest extends UnitTestCase
     public function registers_daemon_as_dev_command(): void
     {
         $this->assertSame(
-            'php artisan hotreload:serve --host=127.0.0.1 --port=7357',
+            'php artisan hotreload:serve --host=127.0.0.1',
             $this->devCommand('hotreload')['command'] ?? null,
         );
     }
 
     #[Test]
-    public function dev_command_uses_configured_port(): void
-    {
-        config()->set('hotreload.port', 7777);
-
-        $this->rebootDevCommands();
-
-        $this->assertSame('php artisan hotreload:serve --host=127.0.0.1 --port=7777', $this->devCommand('hotreload')['command']);
-    }
-
-    #[Test]
     public function dev_command_listens_on_all_interfaces_inside_containers(): void
     {
-        $this->launcher->inContainer = true;
+        Hotreload::assumeRunningInContainer();
 
         $this->rebootDevCommands();
 
-        $this->assertSame('php artisan hotreload:serve --host=0.0.0.0 --port=7357', $this->devCommand('hotreload')['command']);
+        $this->assertSame('php artisan hotreload:serve --host=0.0.0.0', $this->devCommand('hotreload')['command']);
     }
 
     #[Test]
     public function doesnt_register_dev_command_with_random_port_inside_containers(): void
     {
-        $this->launcher->inContainer = true;
+        Hotreload::assumeRunningInContainer();
 
         config()->set('hotreload.port', 0);
 
@@ -92,7 +86,7 @@ class DaemonAutoStartTest extends UnitTestCase
         $this->dispatchCommandStarting('serve');
 
         $this->assertEquals([
-            ['host' => '127.0.0.1', 'port' => 7357, 'parentPid' => getmypid()],
+            ['host' => '127.0.0.1', 'parentPid' => getmypid()],
         ], $this->launcher->launches);
     }
 
@@ -114,13 +108,13 @@ class DaemonAutoStartTest extends UnitTestCase
     }
 
     #[Test]
-    public function uses_configured_port(): void
+    public function binds_to_all_interfaces_inside_containers_even_when_serve_uses_localhost(): void
     {
-        config()->set('hotreload.port', 7777);
+        Hotreload::assumeRunningInContainer();
 
         $this->dispatchCommandStarting('serve');
 
-        $this->assertSame(7777, $this->launcher->launches[0]['port']);
+        $this->assertSame('0.0.0.0', $this->launcher->launches[0]['host']);
     }
 
     #[Test]
@@ -134,7 +128,7 @@ class DaemonAutoStartTest extends UnitTestCase
     #[Test]
     public function doesnt_launch_with_random_port_inside_containers(): void
     {
-        $this->launcher->inContainer = true;
+        Hotreload::assumeRunningInContainer();
 
         config()->set('hotreload.port', 0);
 
@@ -146,11 +140,11 @@ class DaemonAutoStartTest extends UnitTestCase
     #[Test]
     public function launches_inside_containers_with_the_default_port(): void
     {
-        $this->launcher->inContainer = true;
+        Hotreload::assumeRunningInContainer();
 
         $this->dispatchCommandStarting('serve', '--host=0.0.0.0');
 
-        $this->assertSame(['host' => '0.0.0.0', 'port' => 7357, 'parentPid' => getmypid()], $this->launcher->launches[0]);
+        $this->assertSame(['host' => '0.0.0.0', 'parentPid' => getmypid()], $this->launcher->launches[0]);
     }
 
     /**
@@ -182,15 +176,8 @@ class FakeDaemonLauncher extends DaemonLauncher
 {
     public array $launches = [];
 
-    public bool $inContainer = false;
-
-    public function launch(string $host, int $port, int $parentPid): void
+    public function launch(string $host, int $parentPid): void
     {
-        $this->launches[] = ['host' => $host, 'port' => $port, 'parentPid' => $parentPid];
-    }
-
-    public function runningInContainer(): bool
-    {
-        return $this->inContainer;
+        $this->launches[] = ['host' => $host, 'parentPid' => $parentPid];
     }
 }

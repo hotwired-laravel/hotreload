@@ -12,7 +12,7 @@ class DaemonLauncher
      * this process' STDOUT and STDERR (no pipes), so it never blocks on a full
      * pipe buffer that nobody reads.
      */
-    public function launch(string $host, int $port, int $parentPid): void
+    public function launch(string $host, int $parentPid): void
     {
         if ($this->process !== null || ! function_exists('proc_open')) {
             return;
@@ -23,7 +23,6 @@ class DaemonLauncher
             $this->consoleScript(),
             'hotreload:serve',
             "--host={$host}",
-            "--port={$port}",
             "--parent-pid={$parentPid}",
         ];
 
@@ -34,11 +33,6 @@ class DaemonLauncher
         ], $pipes, getcwd() ?: base_path());
 
         $this->process = is_resource($process) ? $process : null;
-    }
-
-    public function runningInContainer(): bool
-    {
-        return is_file('/.dockerenv') || (bool) env('LARAVEL_SAIL');
     }
 
     public function stop(): void

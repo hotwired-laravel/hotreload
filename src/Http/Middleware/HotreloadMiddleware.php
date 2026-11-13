@@ -36,11 +36,11 @@ class HotreloadMiddleware
 
     private function daemonUrlTag(Request $request): string
     {
-        if (! ($daemon = Hotreload::runningDaemon())) {
+        if (! ($url = Hotreload::daemonUrl($request->getHost()))) {
             return '';
         }
 
-        $url = e(config('hotreload.url') ?: "http://{$request->getHost()}:{$daemon['port']}");
+        $url = e($url);
 
         return <<<HTML
         <meta name="hotwire-hotreload:url" content="{$url}">

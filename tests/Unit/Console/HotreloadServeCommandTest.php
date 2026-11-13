@@ -144,7 +144,28 @@ class HotreloadServeCommandTest extends UnitTestCase
     }
 
     #[Test]
-    public function falls_back_to_a_random_port_when_the_port_is_taken(): void
+    public function falls_back_to_a_random_port_when_the_default_port_is_taken(): void
+    {
+        @unlink(Hotreload::hotFile());
+
+        if (! ($taken = @stream_socket_server('tcp://127.0.0.1:' . Hotreload::DEFAULT_PORT))) {
+            $this->markTestSkipped('The default port is already in use.');
+        }
+
+        try {
+            $this->daemon = $this->startDaemon(port: null);
+
+            $daemon = $this->waitFor(fn () => Hotreload::runningDaemon(), 'Daemon did not start: ' . $this->daemon->getErrorOutput() . $this->daemon->getOutput());
+
+            $this->assertNotSame(Hotreload::DEFAULT_PORT, $daemon['port']);
+            $this->assertStringContainsString('Using a random port instead', $this->daemon->getOutput());
+        } finally {
+            fclose($taken);
+        }
+    }
+
+    #[Test]
+    public function fails_when_an_explicit_port_is_taken(): void
     {
         @unlink(Hotreload::hotFile());
 
@@ -152,12 +173,14 @@ class HotreloadServeCommandTest extends UnitTestCase
         $takenPort = (int) parse_url('tcp://' . stream_socket_get_name($taken, false), PHP_URL_PORT);
 
         try {
-            $this->daemon = $this->startDaemon($takenPort);
+            foreach ([[$takenPort, []], [null, ['HOTRELOAD_PORT' => (string) $takenPort]]] as [$port, $env]) {
+                $daemon = $this->startDaemon($port, $env);
+                $daemon->wait();
 
-            $daemon = $this->waitFor(fn () => Hotreload::runningDaemon(), 'Daemon did not start: ' . $this->daemon->getErrorOutput() . $this->daemon->getOutput());
-
-            $this->assertNotSame($takenPort, $daemon['port']);
-            $this->assertStringContainsString('Using a random port instead', $this->daemon->getOutput());
+                $this->assertSame(1, $daemon->getExitCode(), $daemon->getOutput());
+                $this->assertStringContainsString('failed to bind', $daemon->getOutput());
+                $this->assertNull(Hotreload::runningDaemon());
+            }
         } finally {
             fclose($taken);
         }
@@ -183,12 +206,12 @@ class HotreloadServeCommandTest extends UnitTestCase
         ];
     }
 
-    private function startDaemon(int $port = 0): Process
+    private function startDaemon(?int $port = 0, array $env = []): Process
     {
         $daemon = new Process(
-            [PHP_BINARY, package_path('vendor', 'bin', 'testbench'), 'hotreload:serve', "--port={$port}"],
+            [PHP_BINARY, package_path('vendor', 'bin', 'testbench'), 'hotreload:serve', ...($port === null ? [] : ["--port={$port}"])],
             package_path(),
-            ['HOTRELOAD_ENABLED' => 'true'],
+            ['HOTRELOAD_ENABLED' => 'true', ...$env],
         );
 
         $daemon->start();

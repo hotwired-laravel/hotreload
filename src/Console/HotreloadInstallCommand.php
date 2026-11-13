@@ -44,7 +44,12 @@ class HotreloadInstallCommand extends Command
         $service = (string) env('APP_SERVICE', 'laravel.test');
         $name = basename($file);
 
-        $lines = explode("\n", (string) file_get_contents($file));
+        $contents = (string) file_get_contents($file);
+
+        // Keep the file's line endings (like CRLF on Windows checkouts)...
+        $eol = str_contains($contents, "\r\n") ? "\r\n" : "\n";
+
+        $lines = explode($eol, $contents);
 
         $block = $this->findService($lines, $service);
 
@@ -70,7 +75,7 @@ class HotreloadInstallCommand extends Command
             return;
         }
 
-        file_put_contents($file, implode("\n", $updated));
+        file_put_contents($file, implode($eol, $updated));
 
         $this->components->info("Published the hotreload port on the [{$service}] service in [{$name}].");
         $this->components->warn('Recreate the container for the port to take effect (like with `sail up -d`).');

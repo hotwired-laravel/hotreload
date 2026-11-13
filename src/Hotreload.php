@@ -18,6 +18,8 @@ class Hotreload
     protected static $htmlPaths = [];
     protected static $stimulusPaths = [];
     protected static $cssPaths = [];
+    protected static ?bool $runningInContainer = null;
+
     public const DEFAULT_PORT = 7357;
 
     public static function enabled(): bool
@@ -31,10 +33,7 @@ class Hotreload
     public static function registerDevCommands(): void
     {
         if (class_exists(DevCommands::class) && static::enabled() && static::shouldStartDaemon()) {
-            // Inside containers, the daemon must listen on all interfaces so published ports can reach it...
-            $host = app(DaemonLauncher::class)->runningInContainer() ? '0.0.0.0' : '127.0.0.1';
-
-            DevCommands::artisan("hotreload:serve --host={$host} --port=" . static::port(), 'hotreload');
+            DevCommands::artisan('hotreload:serve --host=' . static::daemonHost(), 'hotreload');
         }
     }
 
@@ -45,17 +44,57 @@ class Hotreload
     public static function shouldStartDaemon(): bool
     {
         return static::port() !== 0
-            || ! app(DaemonLauncher::class)->runningInContainer();
+            || ! static::runningInContainer();
+    }
+
+    /**
+     * The interface the daemon binds to. Inside containers, it must listen on all interfaces so
+     * published ports can reach it. Otherwise, it follows the host `php artisan serve` uses.
+     */
+    public static function daemonHost(?string $serveHost = null): string
+    {
+        if (static::runningInContainer()) {
+            return '0.0.0.0';
+        }
+
+        return in_array($serveHost, [null, '', 'localhost', '127.0.0.1'], true) ? '127.0.0.1' : '0.0.0.0';
+    }
+
+    public static function runningInContainer(): bool
+    {
+        return static::$runningInContainer ?? (is_file('/.dockerenv') || (bool) env('LARAVEL_SAIL'));
+    }
+
+    /**
+     * Overrides the container detection (useful for testing). Pass null to detect it again.
+     */
+    public static function assumeRunningInContainer(?bool $runningInContainer = true): void
+    {
+        static::$runningInContainer = $runningInContainer;
     }
 
     public static function port(): int
     {
-        return (int) config('hotreload.port', static::DEFAULT_PORT);
+        return (int) (config('hotreload.port') ?? static::DEFAULT_PORT);
+    }
+
+    /**
+     * Whether the port (or the URL the browser uses) was explicitly configured. In that case,
+     * the daemon must use that exact port instead of falling back to a random one.
+     */
+    public static function hasExplicitPort(): bool
+    {
+        return filled(config('hotreload.port')) || filled(config('hotreload.url'));
     }
 
     public static function hotFile(): string
     {
         return storage_path('framework/hotreload.json');
+    }
+
+    public static function lockFile(): string
+    {
+        return static::hotFile() . '.lock';
     }
 
     /**
@@ -65,7 +104,7 @@ class Hotreload
      */
     public static function runningDaemon(): ?array
     {
-        if (! is_file($file = static::hotFile())) {
+        if (! is_file($file = static::hotFile()) || ! static::daemonHoldsLock()) {
             return null;
         }
 
@@ -75,26 +114,52 @@ class Hotreload
             return null;
         }
 
-        if (! static::processIsRunning((int) $daemon['pid'])) {
+        return ['port' => (int) $daemon['port'], 'pid' => (int) $daemon['pid']];
+    }
+
+    /**
+     * The URL the browser should use to connect to the daemon, or null when there's no daemon.
+     * A configured URL always wins, since the daemon may run somewhere we can't see (like
+     * another container). When it's unreachable, the browser falls back to the SSE route.
+     */
+    public static function daemonUrl(string $requestHost): ?string
+    {
+        if (filled($url = config('hotreload.url'))) {
+            return $url;
+        }
+
+        if (! ($daemon = static::runningDaemon())) {
             return null;
         }
 
-        return ['port' => (int) $daemon['port'], 'pid' => (int) $daemon['pid']];
+        return "http://{$requestHost}:{$daemon['port']}";
+    }
+
+    /**
+     * Whether we can tell if another process is still running (see processIsRunning).
+     */
+    public static function canCheckProcesses(): bool
+    {
+        return function_exists('posix_kill') || is_dir('/proc/self');
     }
 
     public static function processIsRunning(int $pid): bool
     {
-        // Without the posix extension we can't check, so we assume it's running...
-        if (! function_exists('posix_kill')) {
-            return true;
+        if (function_exists('posix_kill')) {
+            if (@posix_kill($pid, 0)) {
+                return true;
+            }
+
+            // EPERM means the process exists but belongs to another user...
+            return posix_get_last_error() === 1;
         }
 
-        if (@posix_kill($pid, 0)) {
-            return true;
+        if (is_dir('/proc/self')) {
+            return is_dir("/proc/{$pid}");
         }
 
-        // EPERM means the process exists but belongs to another user...
-        return posix_get_last_error() === 1;
+        // We can't check, so we assume it's running (see canCheckProcesses)...
+        return true;
     }
 
     public static function withInotifyWatcher(): void
@@ -165,6 +230,29 @@ class Hotreload
     public static function getConfiguredWatcher(): string
     {
         return config('hotwire-hotreload.watcher', extension_loaded('inotify') ? 'inotify' : 'simple');
+    }
+
+    /**
+     * The running daemon holds an exclusive lock for as long as it lives (the OS releases it
+     * when the process dies), so this works even when it couldn't clean up its hot file.
+     */
+    protected static function daemonHoldsLock(): bool
+    {
+        if (! ($lock = @fopen(static::lockFile(), 'r'))) {
+            return false;
+        }
+
+        try {
+            if (flock($lock, LOCK_SH | LOCK_NB)) {
+                flock($lock, LOCK_UN);
+
+                return false;
+            }
+
+            return true;
+        } finally {
+            fclose($lock);
+        }
     }
 
     protected static function defaultPaths(string $type): array

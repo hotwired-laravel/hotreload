@@ -1,7 +1,5 @@
 <?php
 
-use HotwiredLaravel\Hotreload\Hotreload;
-
 return [
     /*
     |--------------------------------------------------------------------------
@@ -20,14 +18,14 @@ return [
     | Daemon Port
     |--------------------------------------------------------------------------
     |
-    | The port the hotreload daemon binds to. When the port is taken (for instance,
-    | by another app's daemon), the daemon falls back to a random port, except
-    | inside containers, where only published ports are reachable. Set it to
-    | 0 to always use a random port.
+    | The port the hotreload daemon binds to (defaults to 7357). When the default
+    | port is taken (like by another app's daemon), the daemon falls back to a
+    | random port. It won't do that when you set the port (or the URL below)
+    | explicitly, nor inside containers. Set it to 0 to use a random port.
     |
     */
 
-    'port' => (int) env('HOTRELOAD_PORT', Hotreload::DEFAULT_PORT),
+    'port' => env('HOTRELOAD_PORT'),
 
     /*
     |--------------------------------------------------------------------------

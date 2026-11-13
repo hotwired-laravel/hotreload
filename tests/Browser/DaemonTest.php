@@ -32,25 +32,7 @@ class DaemonTest extends BrowserTestCase
 
         // Testbench Dusk serves the app with `php -S`, so the `serve` hook doesn't fire. We start the daemon ourselves...
         if (static::$daemon === null) {
-            @unlink(Hotreload::hotFile());
-
-            static::$daemon = new Process(
-                [PHP_BINARY, package_path('vendor', 'bin', 'testbench'), 'hotreload:serve', '--port=0'],
-                package_path(),
-                ['HOTRELOAD_ENABLED' => 'true'],
-            );
-
-            static::$daemon->start();
-
-            $deadline = microtime(true) + 10;
-
-            while (! Hotreload::runningDaemon()) {
-                if (microtime(true) > $deadline) {
-                    $this->fail('Daemon did not start: ' . static::$daemon->getErrorOutput() . static::$daemon->getOutput());
-                }
-
-                usleep(50_000);
-            }
+            $this->startDaemon();
         }
     }
 
@@ -76,12 +58,42 @@ class DaemonTest extends BrowserTestCase
     }
 
     #[Test]
+    public function reconnects_when_the_daemon_restarts_on_another_port(): void
+    {
+        $port = Hotreload::runningDaemon()['port'];
+
+        $this->browse(function (Browser $browser) use ($port) {
+            $visit = $browser->visit('/?reload_method=morph');
+
+            $visit->waitUntil('document.body.dataset.hotwireHotreloadReady === "true"');
+
+            $this->assertSame("http://127.0.0.1:{$port}", $visit->script('return document.body.dataset.hotwireHotreloadUrl')[0]);
+
+            static::$daemon->stop();
+            $this->startDaemon();
+
+            $newPort = Hotreload::runningDaemon()['port'];
+
+            $this->assertNotSame($port, $newPort);
+
+            $visit->waitUntil("document.body.dataset.hotwireHotreloadUrl === 'http://127.0.0.1:{$newPort}'", 15);
+
+            $this->editFile(workbench_path('resources', 'views', 'hello.blade.php'), 'REPLACE_HTML', 'Reconnected!');
+
+            $visit->waitForText('Reconnected!');
+        });
+    }
+
+    #[Test]
     public function falls_back_to_the_in_process_route_when_daemon_is_unreachable(): void
     {
         static::$daemon->stop();
         static::$daemon = null;
 
-        // A hot file pointing to a dead port, owned by a live process (us)...
+        // A hot file pointing to a dead port, with the daemon's lock held by a live process (us)...
+        $lock = fopen(Hotreload::lockFile(), 'c');
+        flock($lock, LOCK_EX);
+
         file_put_contents(Hotreload::hotFile(), json_encode(['port' => 1, 'pid' => getmypid()]));
 
         try {
@@ -98,7 +110,33 @@ class DaemonTest extends BrowserTestCase
                 $visit->waitForText('Fallback!');
             });
         } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+
             @unlink(Hotreload::hotFile());
+        }
+    }
+
+    private function startDaemon(): void
+    {
+        @unlink(Hotreload::hotFile());
+
+        static::$daemon = new Process(
+            [PHP_BINARY, package_path('vendor', 'bin', 'testbench'), 'hotreload:serve', '--port=0'],
+            package_path(),
+            ['HOTRELOAD_ENABLED' => 'true'],
+        );
+
+        static::$daemon->start();
+
+        $deadline = microtime(true) + 10;
+
+        while (! Hotreload::runningDaemon()) {
+            if (microtime(true) > $deadline) {
+                $this->fail('Daemon did not start: ' . static::$daemon->getErrorOutput() . static::$daemon->getOutput());
+            }
+
+            usleep(50_000);
         }
     }
 }

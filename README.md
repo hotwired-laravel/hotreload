@@ -101,7 +101,9 @@ By default, the daemon listens on port `7357`. You may change it with the `HOTRE
 HOTRELOAD_PORT=7358
 ```
 
-If the port is already taken (for instance, by another app's daemon), the daemon falls back to a random port, so you can run multiple apps side by side.
+If the default port is already taken (for instance, by another app's daemon), the daemon falls back to a random port, so you can run multiple apps side by side. When you set `HOTRELOAD_PORT` (or `HOTRELOAD_URL`) explicitly, the daemon uses that exact port and fails to start if it's taken, since something (like a proxy or a published port) expects it there.
+
+If the daemon restarts (even on a different port), open tabs reconnect to it on their own.
 
 You may also start the daemon manually with `php artisan hotreload:serve`.
 
@@ -121,7 +123,7 @@ curl http://localhost:7357/up
 }
 ```
 
-When the daemon isn't running (for instance, when your app is served by Herd, Valet, or nginx + PHP-FPM), the browser falls back to an SSE route served by your app. That route keeps one PHP worker busy per open tab, so make sure your server has more than one worker.
+When the daemon isn't running (for instance, when your app is served by Herd, Valet, or nginx + PHP-FPM), the browser falls back to an SSE route served by your app. That route keeps one PHP worker busy per open tab, so make sure your server has more than one worker (see [the in-process fallback](#the-in-process-fallback)).
 
 #### Laravel Sail and Docker
 
@@ -138,16 +140,34 @@ services:
 
 Inside containers, the daemon doesn't fall back to a random port when its port is taken, since random ports can't be reached from the browser.
 
-If the published port differs from the one inside the container (or the daemon sits behind a proxy), set the URL the browser should use:
+If the published port differs from the one inside the container (or the daemon sits behind a proxy or runs in another container), set the URL the browser should use:
 
 ```env
 HOTRELOAD_URL=http://localhost:7357
 ```
 
-If you don't publish the port, the browser falls back to the in-process SSE route. In that case, set the number of PHP server workers in your `.env` file so the SSE connection doesn't block your app:
+When `HOTRELOAD_URL` is set, the browser always tries it first, even if the app can't see the daemon, and falls back to the in-process SSE route when it can't connect.
+
+If you don't publish the port, the browser falls back to the [in-process SSE route](#the-in-process-fallback).
+
+#### The In-Process Fallback
+
+When the browser can't reach the daemon, it uses an SSE route served by your app, which keeps one PHP worker busy for each open tab. When using `php artisan serve`, set the number of PHP server workers in your `.env` file:
 
 ```env
 PHP_CLI_SERVER_WORKERS=4
+```
+
+Laravel only respects that setting when the server runs with the `--no-reload` option, so you must also pass it, otherwise the SSE connection blocks the only worker and your app hangs:
+
+```bash
+php artisan serve --no-reload
+```
+
+On Laravel Sail, you may do that by setting the command Sail uses to start the server in your `.env` file:
+
+```env
+SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=80 --no-reload"
 ```
 
 #### HTML Replacing Method

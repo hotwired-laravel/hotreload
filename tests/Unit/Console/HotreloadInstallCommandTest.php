@@ -56,6 +56,16 @@ class HotreloadInstallCommandTest extends UnitTestCase
         parent::tearDown();
     }
 
+    public static function composeFiles(): array
+    {
+        return [
+            ['compose.yaml'],
+            ['compose.yml'],
+            ['docker-compose.yaml'],
+            ['docker-compose.yml'],
+        ];
+    }
+
     #[Test]
     public function publishes_the_port_on_the_laravel_service(): void
     {
@@ -107,16 +117,6 @@ class HotreloadInstallCommandTest extends UnitTestCase
         $this->artisan('hotreload:install')->assertSuccessful();
 
         $this->assertContains(self::MAPPING, $this->composeFile($name)['services']['laravel.test']['ports']);
-    }
-
-    public static function composeFiles(): array
-    {
-        return [
-            ['compose.yaml'],
-            ['compose.yml'],
-            ['docker-compose.yaml'],
-            ['docker-compose.yml'],
-        ];
     }
 
     #[Test]
@@ -247,6 +247,19 @@ class HotreloadInstallCommandTest extends UnitTestCase
 
         $this->artisan('hotreload:install')->assertSuccessful();
 
+        $this->assertContains(self::MAPPING, $this->composeFile('compose.yaml')['services']['laravel.test']['ports']);
+    }
+
+    #[Test]
+    public function keeps_crlf_line_endings(): void
+    {
+        $this->writeFile('compose.yaml', str_replace("\n", "\r\n", self::SAIL_COMPOSE));
+
+        $this->artisan('hotreload:install')->assertSuccessful();
+
+        $contents = file_get_contents("{$this->path}/compose.yaml");
+
+        $this->assertSame(0, preg_match("/(?<!\r)\n/", $contents), 'Found LF line endings in a CRLF file.');
         $this->assertContains(self::MAPPING, $this->composeFile('compose.yaml')['services']['laravel.test']['ports']);
     }
 

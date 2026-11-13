@@ -983,21 +983,58 @@
 
   // js/channels/index.js
   var FALLBACK_URL = "/hotwired-laravel-hotreload/sse";
+  var DAEMON_URL_ENDPOINT = "/hotwired-laravel-hotreload/daemon";
+  var MAX_RETRY_DELAY = 5e3;
   var ServerSentEventsChannel = class {
-    static async start() {
+    static start() {
       if (!config_default.url) {
         return this.connect(FALLBACK_URL);
       }
-      const sse = this.connect(config_default.url);
-      let opened = false;
-      sse.addEventListener("open", () => opened = true, { once: true });
-      sse.addEventListener("error", () => {
-        if (opened || sse.readyState === EventSource.OPEN)
-          return;
-        log(`Couldn't connect to the hotreload daemon at ${config_default.url}, falling back to ${FALLBACK_URL}`);
-        sse.close();
-        this.connect(FALLBACK_URL);
-      }, { once: true });
+      this.connectToDaemon(config_default.url);
+    }
+    static connectToDaemon(url, { connected = false, attempt = 0 } = {}) {
+      const sse = this.connect(url);
+      sse.addEventListener("open", () => {
+        connected = true;
+        attempt = 0;
+      });
+      sse.addEventListener(
+        "error",
+        () => {
+          sse.close();
+          this.recover(url, { connected, attempt });
+        },
+        { once: true }
+      );
+    }
+    static async recover(url, { connected, attempt }) {
+      const current = await this.fetchDaemonUrl();
+      if (!connected) {
+        if (current && current !== url) {
+          return this.connectToDaemon(current);
+        }
+        log(`Couldn't connect to the hotreload daemon at ${url}, falling back to ${FALLBACK_URL}`);
+        return this.connect(FALLBACK_URL);
+      }
+      const delay = Math.min(250 * 2 ** attempt, MAX_RETRY_DELAY);
+      const next = { connected, attempt: attempt + 1 };
+      log(`Lost the connection to the hotreload daemon, retrying in ${delay}ms`);
+      setTimeout(() => {
+        current ? this.connectToDaemon(current, next) : this.recover(url, next);
+      }, delay);
+    }
+    static async fetchDaemonUrl() {
+      try {
+        const response = await fetch(DAEMON_URL_ENDPOINT, {
+          headers: { Accept: "application/json" },
+          cache: "no-store"
+        });
+        if (!response.ok)
+          return void 0;
+        return (await response.json()).url ?? null;
+      } catch {
+        return void 0;
+      }
     }
     static connect(url) {
       const sse = new EventSource(url);
