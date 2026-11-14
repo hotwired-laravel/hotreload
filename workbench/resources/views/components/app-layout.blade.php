@@ -17,7 +17,7 @@
                 @endforeach
                 "app.js": "{{ asset('/assetpipeline/js/app.js') }}",
                 "@hotwired/stimulus-loading": "{{ asset('/assetpipeline/js/lib/stimulus-loading.js') }}",
-                "@hotwired/stimulus": "https://cdn.skypack.dev/@hotwired/stimulus",
+                "@hotwired/stimulus": "https://cdn.jsdelivr.net/npm/@hotwired/stimulus@3.2.2/+esm",
                 "@hotwired/turbo": "https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.12/+esm"
             }
         }
