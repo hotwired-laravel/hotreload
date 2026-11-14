@@ -26,6 +26,7 @@
         <env name="CACHE_STORE" value="file"/>
         <env name="SESSION_DRIVER" value="file"/>
         <env name="PHP_CLI_SERVER_WORKERS" value="4"/>
+        <env name="HOTRELOAD_ENABLED" value="true"/>
     </php>
     <source>
         <include>

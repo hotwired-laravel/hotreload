@@ -19,11 +19,14 @@
     "tightenco/duster": "^3.1"
   },
   "require": {
+    "illuminate/http": "^12.4|^13.0",
     "illuminate/support": "^12.4|^13.0",
-    "illuminate/http": "^12.4|^13.0"
+    "react/http": "^1.12"
   },
   "suggest": {
-    "ext-inotify": "Required for a better performance."
+    "ext-inotify": "Required for a better performance.",
+    "ext-pcntl": "Allows the hotreload daemon to shut down cleanly on signals.",
+    "ext-posix": "Allows the hotreload daemon to stop when its parent process exits."
   },
   "config": {
     "sort-packages": true

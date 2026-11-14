@@ -5,8 +5,10 @@ namespace Tests\Unit\Watchers;
 use Closure;
 use HotwiredLaravel\Hotreload\Contracts\FileWatcher;
 use HotwiredLaravel\Hotreload\Watchers\InotifyFileWatcher;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use Tests\UnitTestCase;
 
+#[RequiresPhpExtension('inotify')]
 class InotifyFileWatcherTest extends UnitTestCase
 {
     use FileWatcherTests;

@@ -11,4 +11,3 @@ class HotreloadException extends RuntimeException
         return new static('The `inotify` extension is missing or not loaded. Install it or switch to the simple watcher.');
     }
 }
-

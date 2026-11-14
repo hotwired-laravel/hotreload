@@ -2,7 +2,8 @@
   // js/config.js
   var config = {
     loggingEnabled: getConfigurationProperty("logging") ?? false,
-    htmlReloadMethod: getConfigurationProperty("html-reload-method")
+    htmlReloadMethod: getConfigurationProperty("html-reload-method"),
+    url: getConfigurationProperty("url")
   };
   document.addEventListener("turbo:load", () => {
     reloadConfigs();
@@ -981,13 +982,67 @@
   };
 
   // js/channels/index.js
+  var FALLBACK_URL = "/hotwired-laravel-hotreload/sse";
+  var DAEMON_URL_ENDPOINT = "/hotwired-laravel-hotreload/daemon";
+  var MAX_RETRY_DELAY = 5e3;
   var ServerSentEventsChannel = class {
-    static async start() {
-      const sse = new EventSource("/hotwired-laravel-hotreload/sse");
+    static start() {
+      if (!config_default.url) {
+        return this.connect(FALLBACK_URL);
+      }
+      this.connectToDaemon(config_default.url);
+    }
+    static connectToDaemon(url, { connected = false, attempt = 0 } = {}) {
+      const sse = this.connect(url);
+      sse.addEventListener("open", () => {
+        connected = true;
+        attempt = 0;
+      });
+      sse.addEventListener(
+        "error",
+        () => {
+          sse.close();
+          this.recover(url, { connected, attempt });
+        },
+        { once: true }
+      );
+    }
+    static async recover(url, { connected, attempt }) {
+      const current = await this.fetchDaemonUrl();
+      if (!connected) {
+        if (current && current !== url) {
+          return this.connectToDaemon(current);
+        }
+        log(`Couldn't connect to the hotreload daemon at ${url}, falling back to ${FALLBACK_URL}`);
+        return this.connect(FALLBACK_URL);
+      }
+      const delay = Math.min(250 * 2 ** attempt, MAX_RETRY_DELAY);
+      const next = { connected, attempt: attempt + 1 };
+      log(`Lost the connection to the hotreload daemon, retrying in ${delay}ms`);
+      setTimeout(() => {
+        current ? this.connectToDaemon(current, next) : this.recover(url, next);
+      }, delay);
+    }
+    static async fetchDaemonUrl() {
+      try {
+        const response = await fetch(DAEMON_URL_ENDPOINT, {
+          headers: { Accept: "application/json" },
+          cache: "no-store"
+        });
+        if (!response.ok)
+          return void 0;
+        return (await response.json()).url ?? null;
+      } catch {
+        return void 0;
+      }
+    }
+    static connect(url) {
+      const sse = new EventSource(url);
       sse.addEventListener(
         "tick",
         () => {
           document.body.setAttribute("data-hotwire-hotreload-ready", "true");
+          document.body.setAttribute("data-hotwire-hotreload-url", url);
         },
         { once: true }
       );
@@ -1006,6 +1061,7 @@
         const data = JSON.parse(event.data);
         return CssReloader.reload(new RegExp(assetNameFromPath(data.path)));
       });
+      return sse;
     }
   };
   ServerSentEventsChannel.start();
