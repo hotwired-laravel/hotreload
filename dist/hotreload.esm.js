@@ -2,7 +2,8 @@
 var config = {
   loggingEnabled: getConfigurationProperty("logging") ?? false,
   htmlReloadMethod: getConfigurationProperty("html-reload-method"),
-  url: getConfigurationProperty("url")
+  url: getConfigurationProperty("url"),
+  daemon: getConfigurationProperty("daemon")
 };
 document.addEventListener("turbo:load", () => {
   reloadConfigs();
@@ -984,12 +985,31 @@ var CssReloader = class {
 var FALLBACK_URL = "/hotwired-laravel-hotreload/sse";
 var DAEMON_URL_ENDPOINT = "/hotwired-laravel-hotreload/daemon";
 var MAX_RETRY_DELAY = 5e3;
+var DAEMON_STARTUP_TIMEOUT = 1e4;
 var ServerSentEventsChannel = class {
   static start() {
-    if (!config_default.url) {
-      return this.connect(FALLBACK_URL);
+    if (config_default.url) {
+      return this.connectToDaemon(config_default.url);
     }
-    this.connectToDaemon(config_default.url);
+    if (config_default.daemon === "starting") {
+      return this.waitForDaemon();
+    }
+    this.connect(FALLBACK_URL);
+  }
+  static async waitForDaemon() {
+    const deadline = Date.now() + DAEMON_STARTUP_TIMEOUT;
+    let delay = 100;
+    log("Waiting for the hotreload daemon to start...");
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      const url = await this.fetchDaemonUrl();
+      if (url) {
+        return this.connectToDaemon(url);
+      }
+      delay = Math.min(delay * 2, 1e3);
+    }
+    log(`The hotreload daemon didn't start in time, falling back to ${FALLBACK_URL}`);
+    this.connect(FALLBACK_URL);
   }
   static connectToDaemon(url, { connected = false, attempt = 0 } = {}) {
     const sse = this.connect(url);
