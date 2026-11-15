@@ -2,6 +2,7 @@ const config = {
   loggingEnabled: getConfigurationProperty("logging") ?? false,
   htmlReloadMethod: getConfigurationProperty("html-reload-method"),
   url: getConfigurationProperty("url"),
+  daemon: getConfigurationProperty("daemon"),
 };
 
 document.addEventListener("turbo:load", () => {

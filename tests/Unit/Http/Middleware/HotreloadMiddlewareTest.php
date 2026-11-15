@@ -22,6 +22,8 @@ class HotreloadMiddlewareTest extends UnitTestCase
 
         @unlink(Hotreload::hotFile());
 
+        Hotreload::assumeDaemonExpected(null);
+
         parent::tearDown();
     }
 
@@ -31,6 +33,40 @@ class HotreloadMiddlewareTest extends UnitTestCase
         @unlink(Hotreload::hotFile());
 
         $this->get('/')->assertOk()->assertDontSee('hotwire-hotreload:url', false);
+    }
+
+    #[Test]
+    public function tells_the_browser_to_wait_for_the_daemon_under_serve(): void
+    {
+        // Under `php artisan serve`, the page may render before the daemon is up...
+        @unlink(Hotreload::hotFile());
+
+        Hotreload::assumeDaemonExpected();
+
+        $this->get('/')->assertOk()->assertSee(<<<'HTML'
+        <meta name="hotwire-hotreload:daemon" content="starting">
+        HTML, false)->assertDontSee('hotwire-hotreload:url', false);
+    }
+
+    #[Test]
+    public function doesnt_wait_for_the_daemon_when_nobody_launched_it(): void
+    {
+        // Like with Herd, Valet, nginx + PHP-FPM, or a bare `php -S`...
+        @unlink(Hotreload::hotFile());
+
+        Hotreload::assumeDaemonExpected(false);
+
+        $this->get('/')->assertOk()->assertDontSee('hotwire-hotreload:daemon', false);
+    }
+
+    #[Test]
+    public function doesnt_wait_for_the_daemon_when_its_running(): void
+    {
+        Hotreload::assumeDaemonExpected();
+
+        $this->fakeRunningDaemon(4321);
+
+        $this->get('/')->assertSee('hotwire-hotreload:url', false)->assertDontSee('hotwire-hotreload:daemon', false);
     }
 
     #[Test]

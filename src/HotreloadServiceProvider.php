@@ -9,6 +9,7 @@ use HotwiredLaravel\Hotreload\Http\Controllers\HotreloadServerSentEventsControll
 use HotwiredLaravel\Hotreload\Http\Middleware\HotreloadMiddleware;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Foundation\Console\ServeCommand;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Response;
@@ -61,11 +62,32 @@ class HotreloadServiceProvider extends ServiceProvider
                 return;
             }
 
-            $this->app->make(DaemonLauncher::class)->launch(
+            $launched = $this->app->make(DaemonLauncher::class)->launch(
                 host: Hotreload::daemonHost((string) $event->input->getParameterOption('--host', env('SERVER_HOST', '127.0.0.1'))),
                 parentPid: getmypid(),
+                verbose: $event->output->isVerbose(),
             );
+
+            if ($launched) {
+                $this->tellServerWorkersAboutTheDaemon();
+            }
         });
+    }
+
+    /**
+     * Lets the PHP server's workers know the daemon is coming up, so pages they render before
+     * it's ready tell the browser to wait for it (instead of using the in-process SSE route).
+     * `serve` only passes some env vars on to the PHP server, so we add ours to that list.
+     */
+    private function tellServerWorkersAboutTheDaemon(): void
+    {
+        $_ENV[Hotreload::DAEMON_LAUNCHED_ENV] = $_SERVER[Hotreload::DAEMON_LAUNCHED_ENV] = '1';
+
+        putenv(Hotreload::DAEMON_LAUNCHED_ENV . '=1');
+
+        if (! in_array(Hotreload::DAEMON_LAUNCHED_ENV, ServeCommand::$passthroughVariables, true)) {
+            ServeCommand::$passthroughVariables[] = Hotreload::DAEMON_LAUNCHED_ENV;
+        }
     }
 
     private function configureMiddleware(): void

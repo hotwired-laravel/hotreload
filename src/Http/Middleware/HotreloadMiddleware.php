@@ -37,7 +37,11 @@ class HotreloadMiddleware
     private function daemonUrlTag(Request $request): string
     {
         if (! ($url = Hotreload::daemonUrl($request->getHost()))) {
-            return '';
+            // The daemon is still booting, so the browser should wait for it instead of
+            // falling back to the in-process SSE route (which holds up a PHP worker)...
+            return Hotreload::daemonExpected() ? <<<'HTML'
+            <meta name="hotwire-hotreload:daemon" content="starting">
+            HTML : '';
         }
 
         $url = e($url);

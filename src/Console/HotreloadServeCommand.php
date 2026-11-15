@@ -2,11 +2,14 @@
 
 namespace HotwiredLaravel\Hotreload\Console;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use HotwiredLaravel\Hotreload\Events\HotreloadEvent;
 use HotwiredLaravel\Hotreload\FileWatchers;
 use HotwiredLaravel\Hotreload\Hotreload;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Psr\Http\Message\ServerRequestInterface;
 use React\EventLoop\Loop;
 use React\Http\HttpServer;
@@ -28,7 +31,7 @@ class HotreloadServeCommand extends Command
 
     protected $description = 'Start the hotreload daemon that streams file changes to the browser';
 
-    /** @var SplObjectStorage<ThroughStream, null> */
+    /** @var SplObjectStorage<ThroughStream, string> The connected clients, with their addresses. */
     private SplObjectStorage $clients;
 
     private ?FileWatchers $watchers = null;
@@ -39,6 +42,8 @@ class HotreloadServeCommand extends Command
     private $lock = null;
 
     private int $startedAt = 0;
+
+    private ?DateTimeZone $systemTimezone = null;
 
     public function handle(): int
     {
@@ -131,6 +136,10 @@ class HotreloadServeCommand extends Command
             sleep(1);
         }
 
+        if ($waiting) {
+            $this->log('The other daemon stopped. Taking over...');
+        }
+
         return true;
     }
 
@@ -164,9 +173,9 @@ class HotreloadServeCommand extends Command
     private function listenForChanges(): void
     {
         Event::listen(function (HotreloadEvent $event) {
-            if ($this->output->isVerbose()) {
-                $this->line("<fg=gray>[hotreload]</> {$event->eventName()} " . json_encode($event->eventData()));
-            }
+            $clients = count($this->clients);
+
+            $this->log("Sent <fg=yellow>{$event->eventName()}</> " . json_encode($event->eventData(), JSON_UNESCAPED_SLASHES) . ' to ' . $this->clientsCount($clients) . '.');
 
             $this->broadcast($event->eventName(), $event->eventData());
         });
@@ -184,21 +193,44 @@ class HotreloadServeCommand extends Command
 
         $this->watchers = Hotreload::watchers();
         $this->watchers->boot();
+
+        $this->log('Watching for changes using the [' . Hotreload::getConfiguredWatcher() . '] watcher.');
     }
 
     private function stopWatching(): void
     {
-        $this->watchers?->stop();
+        if ($this->watchers === null) {
+            return;
+        }
+
+        $this->watchers->stop();
         $this->watchers = null;
+
+        $this->log('Stopped watching for changes (no clients connected).');
     }
 
     private function handleRequest(ServerRequestInterface $request): Response
     {
-        return match ($request->getUri()->getPath()) {
-            '/', '' => $this->connect(),
-            '/up' => $this->health(),
-            default => new Response(404, ['Content-Type' => 'text/plain'], 'Not Found'),
-        };
+        $path = $request->getUri()->getPath();
+
+        if (in_array($path, ['/', ''], true)) {
+            return $this->connect($this->clientAddress($request));
+        }
+
+        $response = $path === '/up'
+            ? $this->health()
+            : new Response(404, ['Content-Type' => 'text/plain'], 'Not Found');
+
+        $this->log("<fg=gray>{$request->getMethod()} {$path} [{$response->getStatusCode()}] from [{$this->clientAddress($request)}]</>", verbose: true);
+
+        return $response;
+    }
+
+    private function clientAddress(ServerRequestInterface $request): string
+    {
+        $server = $request->getServerParams();
+
+        return ($server['REMOTE_ADDR'] ?? 'unknown') . (isset($server['REMOTE_PORT']) ? ":{$server['REMOTE_PORT']}" : '');
     }
 
     /**
@@ -215,16 +247,25 @@ class HotreloadServeCommand extends Command
         ])->withHeader('Access-Control-Allow-Origin', '*')->withHeader('Cache-Control', 'no-cache');
     }
 
-    private function connect(): Response
+    private function connect(string $client): Response
     {
         $stream = new ThroughStream;
 
+        $this->clients->attach($stream, $client);
+
+        $this->log("<fg=green>Client connected</> [{$client}] (" . $this->clientsCount(count($this->clients)) . ' connected).');
+
         $this->startWatching();
 
-        $this->clients->attach($stream);
-
-        $stream->on('close', function () use ($stream) {
+        // The HTTP server closes the stream when the browser goes away (like closing the tab)...
+        $stream->on('close', function () use ($stream, $client) {
             $this->clients->detach($stream);
+
+            if ($this->cleanedUp) {
+                return;
+            }
+
+            $this->log("<fg=red>Client disconnected</> [{$client}] (" . $this->clientsCount(count($this->clients)) . ' connected).');
 
             if (count($this->clients) === 0) {
                 $this->stopWatching();
@@ -264,7 +305,13 @@ class HotreloadServeCommand extends Command
     {
         Loop::addPeriodicTimer(0.05, fn () => $this->watchers?->tick());
 
-        Loop::addPeriodicTimer(5, fn () => $this->broadcast('tick', ['time' => time()]));
+        Loop::addPeriodicTimer(5, function () {
+            if (count($this->clients) > 0) {
+                $this->log('<fg=gray>Sent tick to ' . $this->clientsCount(count($this->clients)) . '.</>', verbose: true);
+            }
+
+            $this->broadcast('tick', ['time' => time()]);
+        });
 
         if (($parentPid = (int) $this->option('parent-pid')) > 0) {
             Loop::addPeriodicTimer(1, function () use ($parentPid) {
@@ -302,11 +349,17 @@ class HotreloadServeCommand extends Command
 
         $this->cleanedUp = true;
 
-        foreach ($this->clients as $client) {
+        // We're going away, so the clients' close events don't need to be logged one by one...
+        $clients = iterator_to_array($this->clients);
+        $this->clients = new SplObjectStorage;
+
+        foreach ($clients as $client) {
             $client->end();
         }
 
         $this->stopWatching();
+
+        $this->log('Hotreload daemon stopped' . (count($clients) ? ' (disconnected ' . $this->clientsCount(count($clients)) . ').' : '.'));
 
         // Only remove the hot file if it's ours (another daemon may have replaced it)...
         $daemon = json_decode((string) @file_get_contents(Hotreload::hotFile()), true);
@@ -314,5 +367,44 @@ class HotreloadServeCommand extends Command
         if (is_array($daemon) && ($daemon['pid'] ?? null) === getmypid()) {
             @unlink(Hotreload::hotFile());
         }
+    }
+
+    /**
+     * The PHP server logs its requests in the system's timezone (not the app's), so we
+     * use it as well. Otherwise, our lines would look out of order next to its lines.
+     */
+    private function systemTimezone(): DateTimeZone
+    {
+        if ($this->systemTimezone) {
+            return $this->systemTimezone;
+        }
+
+        $name = getenv('TZ') ?: (@readlink('/etc/localtime') ? Str::after((string) readlink('/etc/localtime'), 'zoneinfo/') : null);
+
+        try {
+            return $this->systemTimezone = new DateTimeZone(ltrim((string) $name, ':') ?: date_default_timezone_get());
+        } catch (Throwable) {
+            return $this->systemTimezone = new DateTimeZone(date_default_timezone_get());
+        }
+    }
+
+    private function clientsCount(int $count): string
+    {
+        return $count . ' ' . ($count === 1 ? 'client' : 'clients');
+    }
+
+    /**
+     * Logs a line to the terminal, formatted like `php artisan serve`'s request log (since
+     * that's usually where it shows up). Verbose lines only show with `-v`.
+     */
+    private function log(string $message, bool $verbose = false): void
+    {
+        if ($verbose && ! $this->output->isVerbose()) {
+            return;
+        }
+
+        [$date, $time] = explode(' ', (new DateTimeImmutable('now', $this->systemTimezone()))->format('Y-m-d H:i:s'));
+
+        $this->output->writeln("  <fg=gray>{$date}</> {$time} <fg=blue>hotreload</> {$message}");
     }
 }

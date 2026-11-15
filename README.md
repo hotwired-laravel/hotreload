@@ -103,7 +103,16 @@ HOTRELOAD_PORT=7358
 
 If the default port is already taken (for instance, by another app's daemon), the daemon falls back to a random port, so you can run multiple apps side by side. When you set `HOTRELOAD_PORT` (or `HOTRELOAD_URL`) explicitly, the daemon uses that exact port and fails to start if it's taken, since something (like a proxy or a published port) expects it there.
 
-If the daemon restarts (even on a different port), open tabs reconnect to it on their own.
+If the daemon restarts (even on a different port), open tabs reconnect to it on their own. Pages rendered while the daemon is still starting (like right after you run `php artisan serve`) wait a few seconds for it before falling back to the [in-process SSE route](#the-in-process-fallback).
+
+The daemon logs what it does to the terminal, next to the server's requests: clients connecting and disconnecting, the events it sends, and when it starts or stops watching for changes. Pass `-v` (to `serve` or `hotreload:serve`) to also see ticks and health checks:
+
+```
+  2026-11-15 16:40:50 hotreload Client connected [127.0.0.1:34966] (1 client connected).
+  2026-11-15 16:40:50 hotreload Watching for changes using the [inotify] watcher.
+  2026-11-15 16:40:52 hotreload Sent reload_html {"path":"/welcome.blade.php"} to 1 client.
+  2026-11-15 16:40:56 hotreload Client disconnected [127.0.0.1:34966] (0 clients connected).
+```
 
 You may also start the daemon manually with `php artisan hotreload:serve`.
 
@@ -152,7 +161,7 @@ If you don't publish the port, the browser falls back to the [in-process SSE rou
 
 #### The In-Process Fallback
 
-When the browser can't reach the daemon, it uses an SSE route served by your app, which keeps one PHP worker busy for each open tab. When using `php artisan serve`, set the number of PHP server workers in your `.env` file:
+When the browser can't reach the daemon, it uses an SSE route served by your app, which keeps one PHP worker busy for each open tab (it's freed about a second after the tab closes). Under `php artisan serve`, its connections and events are logged to the terminal as well. When using `php artisan serve`, set the number of PHP server workers in your `.env` file:
 
 ```env
 PHP_CLI_SERVER_WORKERS=4

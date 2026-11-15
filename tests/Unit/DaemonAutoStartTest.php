@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use HotwiredLaravel\Hotreload\DaemonLauncher;
 use HotwiredLaravel\Hotreload\Hotreload;
 use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Foundation\Console\ServeCommand;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\Test;
@@ -19,6 +20,8 @@ class DaemonAutoStartTest extends UnitTestCase
 
     private array $devCommands = [];
 
+    private array $passthroughVariables = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -28,6 +31,7 @@ class DaemonAutoStartTest extends UnitTestCase
         Hotreload::assumeRunningInContainer(false);
 
         $this->devCommands = (new ReflectionProperty(DevCommands::class, 'commands'))->getValue();
+        $this->passthroughVariables = ServeCommand::$passthroughVariables;
     }
 
     protected function tearDown(): void
@@ -35,6 +39,10 @@ class DaemonAutoStartTest extends UnitTestCase
         (new ReflectionProperty(DevCommands::class, 'commands'))->setValue(null, $this->devCommands);
 
         Hotreload::assumeRunningInContainer(null);
+
+        ServeCommand::$passthroughVariables = $this->passthroughVariables;
+        unset($_ENV[Hotreload::DAEMON_LAUNCHED_ENV], $_SERVER[Hotreload::DAEMON_LAUNCHED_ENV]);
+        putenv(Hotreload::DAEMON_LAUNCHED_ENV);
 
         parent::tearDown();
     }
@@ -118,6 +126,28 @@ class DaemonAutoStartTest extends UnitTestCase
     }
 
     #[Test]
+    public function tells_the_server_workers_the_daemon_is_coming_up(): void
+    {
+        $this->dispatchCommandStarting('serve');
+
+        $this->assertSame('1', $_ENV[Hotreload::DAEMON_LAUNCHED_ENV] ?? null);
+        $this->assertSame('1', getenv(Hotreload::DAEMON_LAUNCHED_ENV));
+        $this->assertContains(Hotreload::DAEMON_LAUNCHED_ENV, ServeCommand::$passthroughVariables);
+    }
+
+    #[Test]
+    public function doesnt_tell_the_server_workers_about_the_daemon_when_it_failed_to_launch(): void
+    {
+        $this->launcher->succeeds = false;
+
+        $this->dispatchCommandStarting('serve');
+
+        $this->assertArrayNotHasKey(Hotreload::DAEMON_LAUNCHED_ENV, $_ENV);
+        $this->assertFalse(getenv(Hotreload::DAEMON_LAUNCHED_ENV));
+        $this->assertNotContains(Hotreload::DAEMON_LAUNCHED_ENV, ServeCommand::$passthroughVariables);
+    }
+
+    #[Test]
     public function doesnt_launch_for_other_commands(): void
     {
         $this->dispatchCommandStarting('queue:work');
@@ -176,8 +206,12 @@ class FakeDaemonLauncher extends DaemonLauncher
 {
     public array $launches = [];
 
-    public function launch(string $host, int $parentPid): void
+    public bool $succeeds = true;
+
+    public function launch(string $host, int $parentPid, bool $verbose = false): bool
     {
         $this->launches[] = ['host' => $host, 'parentPid' => $parentPid];
+
+        return $this->succeeds;
     }
 }

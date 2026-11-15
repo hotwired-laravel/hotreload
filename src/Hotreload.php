@@ -19,6 +19,8 @@ class Hotreload
     protected static $stimulusPaths = [];
     protected static $cssPaths = [];
     protected static ?bool $runningInContainer = null;
+    protected static ?bool $runningUnderServe = null;
+    protected static ?bool $daemonExpected = null;
 
     public const DEFAULT_PORT = 7357;
 
@@ -58,6 +60,45 @@ class Hotreload
         }
 
         return in_array($serveHost, [null, '', 'localhost', '127.0.0.1'], true) ? '127.0.0.1' : '0.0.0.0';
+    }
+
+    /**
+     * Set by `php artisan serve` (and passed to its PHP server workers) once it launched the daemon.
+     */
+    public const DAEMON_LAUNCHED_ENV = 'HOTRELOAD_DAEMON_LAUNCHED';
+
+    /**
+     * Whether the daemon should be coming up, even if it's not running yet. Under `php artisan serve`
+     * (and `php artisan dev`), the daemon is started alongside the PHP server, so a page rendered
+     * right after booting may beat it. The browser then waits for it instead of falling back.
+     */
+    public static function daemonExpected(): bool
+    {
+        return static::$daemonExpected ?? (static::runningUnderServe() && (bool) (getenv(static::DAEMON_LAUNCHED_ENV) ?: ($_SERVER[static::DAEMON_LAUNCHED_ENV] ?? false)));
+    }
+
+    /**
+     * Overrides the daemon detection (useful for testing). Pass null to detect it again.
+     */
+    public static function assumeDaemonExpected(?bool $daemonExpected = true): void
+    {
+        static::$daemonExpected = $daemonExpected;
+    }
+
+    /**
+     * Whether we're running inside the PHP built-in server (like `php artisan serve` uses).
+     */
+    public static function runningUnderServe(): bool
+    {
+        return static::$runningUnderServe ?? PHP_SAPI === 'cli-server';
+    }
+
+    /**
+     * Overrides the built-in server detection (useful for testing). Pass null to detect it again.
+     */
+    public static function assumeRunningUnderServe(?bool $runningUnderServe = true): void
+    {
+        static::$runningUnderServe = $runningUnderServe;
     }
 
     public static function runningInContainer(): bool

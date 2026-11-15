@@ -9,14 +9,45 @@ import config from "../config.js";
 const FALLBACK_URL = "/hotwired-laravel-hotreload/sse";
 const DAEMON_URL_ENDPOINT = "/hotwired-laravel-hotreload/daemon";
 const MAX_RETRY_DELAY = 5000;
+const DAEMON_STARTUP_TIMEOUT = 10000;
 
 class ServerSentEventsChannel {
   static start() {
-    if (!config.url) {
-      return this.connect(FALLBACK_URL);
+    if (config.url) {
+      return this.connectToDaemon(config.url);
     }
 
-    this.connectToDaemon(config.url);
+    if (config.daemon === "starting") {
+      return this.waitForDaemon();
+    }
+
+    this.connect(FALLBACK_URL);
+  }
+
+  // The page was rendered before the daemon was up (like right after `php artisan serve`
+  // starts). We wait for it instead of falling back to the in-process SSE route, since
+  // that one holds up one of the PHP server's workers for as long as the tab is open...
+  static async waitForDaemon() {
+    const deadline = Date.now() + DAEMON_STARTUP_TIMEOUT;
+    let delay = 100;
+
+    log("Waiting for the hotreload daemon to start...");
+
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+
+      const url = await this.fetchDaemonUrl();
+
+      if (url) {
+        return this.connectToDaemon(url);
+      }
+
+      delay = Math.min(delay * 2, 1000);
+    }
+
+    log(`The hotreload daemon didn't start in time, falling back to ${FALLBACK_URL}`);
+
+    this.connect(FALLBACK_URL);
   }
 
   static connectToDaemon(url, { connected = false, attempt = 0 } = {}) {

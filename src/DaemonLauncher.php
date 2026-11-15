@@ -12,10 +12,14 @@ class DaemonLauncher
      * this process' STDOUT and STDERR (no pipes), so it never blocks on a full
      * pipe buffer that nobody reads.
      */
-    public function launch(string $host, int $parentPid): void
+    public function launch(string $host, int $parentPid, bool $verbose = false): bool
     {
-        if ($this->process !== null || ! function_exists('proc_open')) {
-            return;
+        if ($this->process !== null) {
+            return true;
+        }
+
+        if (! function_exists('proc_open')) {
+            return false;
         }
 
         $command = [
@@ -24,6 +28,7 @@ class DaemonLauncher
             'hotreload:serve',
             "--host={$host}",
             "--parent-pid={$parentPid}",
+            ...($verbose ? ['-v'] : []),
         ];
 
         $process = @proc_open($command, [
@@ -33,15 +38,32 @@ class DaemonLauncher
         ], $pipes, getcwd() ?: base_path());
 
         $this->process = is_resource($process) ? $process : null;
+
+        return $this->process !== null;
     }
 
-    public function stop(): void
+    /**
+     * Asks the daemon to stop, and kills it when it doesn't in time. We never block on
+     * `proc_close()` alone, since it waits for the daemon forever (hanging `serve`).
+     */
+    public function stop(float $timeout = 3.0): void
     {
         if ($this->process === null) {
             return;
         }
 
         @proc_terminate($this->process);
+
+        $deadline = microtime(true) + $timeout;
+
+        while (($status = @proc_get_status($this->process)) && $status['running'] && microtime(true) < $deadline) {
+            usleep(20_000);
+        }
+
+        if ($status && $status['running']) {
+            @proc_terminate($this->process, defined('SIGKILL') ? SIGKILL : 9);
+        }
+
         @proc_close($this->process);
 
         $this->process = null;
